@@ -20,6 +20,11 @@ import com.example.appfireflyiii.ui.screens.dashboard.DashboardScreen
 import com.example.appfireflyiii.ui.screens.more.MoreScreen
 import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionScreen
 import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.appfireflyiii.data.network.FireflyClient
+import com.example.appfireflyiii.data.repository.AccountRepository
+import com.example.appfireflyiii.ui.screens.accounts.AccountsViewModel
+import com.example.appfireflyiii.ui.screens.accounts.AccountsViewModelFactory
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +42,9 @@ fun FireflyApp(activity: FragmentActivity) {
     val navController = rememberNavController()
     val tokenStorage = remember { TokenStorage(activity) }
     val biometricAuthManager = remember { BiometricAuthManager(activity) }
+    val fireflyApi = remember { FireflyClient.create { tokenStorage.getToken() } }
+    val accountRepository = remember { AccountRepository(fireflyApi) }
+    val accountsViewModelFactory = remember { AccountsViewModelFactory(accountRepository) }
 
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
@@ -69,7 +77,10 @@ fun FireflyApp(activity: FragmentActivity) {
                 }
             }
             composable(Screen.Dashboard.route) { DashboardScreen(navController) }
-            composable(Screen.Accounts.route) { AccountsScreen(navController) }
+            composable(Screen.Accounts.route) {
+                val viewModel: AccountsViewModel = viewModel(factory = accountsViewModelFactory)
+                AccountsScreen(navController, viewModel)
+            }
             composable(Screen.NewTransaction.route) { NewTransactionScreen(navController) }
             composable(Screen.Reports.route) { ReportsScreen(navController) }
             composable(Screen.More.route) { MoreScreen(navController) }
