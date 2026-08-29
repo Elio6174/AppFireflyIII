@@ -1,6 +1,7 @@
 package com.example.appfireflyiii.data.repository
 
 import com.example.appfireflyiii.data.model.TransactionGroup
+import com.example.appfireflyiii.data.model.TransactionStoreRequest
 import com.example.appfireflyiii.data.network.FireflyApi
 
 class TransactionRepository(private val api: FireflyApi) {
@@ -9,6 +10,24 @@ class TransactionRepository(private val api: FireflyApi) {
         return try {
             val response = api.getTransactions(page = page)
             Result.success(response.data)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getTransactionsByRange(start: String, end: String): Result<List<TransactionGroup>> {
+        return try {
+            val response = api.getTransactions(start = start, end = end, limit = 200)
+            Result.success(response.data)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createTransaction(request: TransactionStoreRequest): Result<Unit> {
+        return try {
+            api.createTransaction(request)
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

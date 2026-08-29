@@ -1,22 +1,130 @@
 package com.example.appfireflyiii.ui.screens.dashboard
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.appfireflyiii.navigation.Screen
 
 @Composable
-fun DashboardScreen(navController: NavController) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+fun DashboardScreen(
+    navController: NavController,
+    viewModel: DashboardViewModel
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (val state = uiState) {
+            is DashboardUiState.Loading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            is DashboardUiState.Error -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("No se pudo cargar: ${state.message}")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { viewModel.loadDashboard() }) {
+                        Text("Reintentar")
+                    }
+                }
+            }
+            is DashboardUiState.Success -> {
+                DashboardContent(state.data, navController)
+            }
+        }
+    }
+}
+
+@Composable
+fun DashboardContent(data: DashboardData, navController: NavController) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
     ) {
-        Button(onClick = { navController.navigate(Screen.Transactions.route) }) {
-            Text("Ver transacciones")
+        Text("Resumen", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Card grande de balance total
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Balance total",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "${data.currencySymbol}${data.totalBalance.setScale(2)}",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Dos cards lado a lado: ingreso y gasto del mes
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Card(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Ingresos (mes)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "+${data.currencySymbol}${data.monthlyIncome.setScale(2)}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFF2E7D32),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Card(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Gastos (mes)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "-${data.currencySymbol}${data.monthlyExpense.setScale(2)}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFFD32F2F),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Acceso rápido", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = { navController.navigate(Screen.Transactions.route) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Ver todas las transacciones")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = { navController.navigate(Screen.Accounts.route) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Ver cuentas")
         }
     }
 }

@@ -39,3 +39,24 @@ data class TransactionSplit(
     @SerializedName("budget_name") val budgetName: String?,
     val notes: String?
 )
+
+data class TransactionStoreRequest(
+    @SerializedName("error_if_duplicate_hash") val errorIfDuplicateHash: Boolean = true,
+    val transactions: List<TransactionSplitRequest>
+)
+
+data class TransactionStoreResponse(
+    val data: TransactionGroup // OJO: aquí es un objeto solo, no una List<>
+)
+
+data class TransactionSplitRequest(
+    val type: String, // "withdrawal", "deposit", "transfer"
+    val date: String, // formato "yyyy-MM-dd"
+    val amount: String,
+    val description: String,
+    @SerializedName("source_id") val sourceId: String? = null,
+    @SerializedName("source_name") val sourceName: String? = null,
+    @SerializedName("destination_id") val destinationId: String? = null,
+    @SerializedName("destination_name") val destinationName: String? = null,
+    @SerializedName("category_name") val categoryName: String? = null
+)

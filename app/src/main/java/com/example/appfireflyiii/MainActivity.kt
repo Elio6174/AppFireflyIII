@@ -29,6 +29,11 @@ import com.example.appfireflyiii.data.repository.TransactionRepository
 import com.example.appfireflyiii.ui.screens.transactions.TransactionsScreen
 import com.example.appfireflyiii.ui.screens.transactions.TransactionsViewModel
 import com.example.appfireflyiii.ui.screens.transactions.TransactionsViewModelFactory
+import com.example.appfireflyiii.ui.screens.dashboard.DashboardViewModel
+import com.example.appfireflyiii.ui.screens.dashboard.DashboardViewModelFactory
+import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionScreen
+import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewModel
+import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewModelFactory
 
 
 class MainActivity : FragmentActivity() {
@@ -52,6 +57,8 @@ fun FireflyApp(activity: FragmentActivity) {
     val accountsViewModelFactory = remember { AccountsViewModelFactory(accountRepository) }
     val transactionRepository = remember { TransactionRepository(fireflyApi) }
     val transactionsViewModelFactory = remember { TransactionsViewModelFactory(transactionRepository) }
+    val dashboardViewModelFactory = remember { DashboardViewModelFactory(accountRepository, transactionRepository) }
+    val newTransactionViewModelFactory = remember { NewTransactionViewModelFactory(transactionRepository) }
 
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
@@ -83,7 +90,10 @@ fun FireflyApp(activity: FragmentActivity) {
                     }
                 }
             }
-            composable(Screen.Dashboard.route) { DashboardScreen(navController) }
+            composable(Screen.Dashboard.route) {
+                val viewModel: DashboardViewModel = viewModel(factory = dashboardViewModelFactory)
+                DashboardScreen(navController, viewModel)
+            }
             composable(Screen.Accounts.route) {
                 val viewModel: AccountsViewModel = viewModel(factory = accountsViewModelFactory)
                 AccountsScreen(navController, viewModel)
@@ -92,7 +102,10 @@ fun FireflyApp(activity: FragmentActivity) {
                 val viewModel: TransactionsViewModel = viewModel(factory = transactionsViewModelFactory)
                 TransactionsScreen(navController, viewModel)
             }
-            composable(Screen.NewTransaction.route) { NewTransactionScreen(navController) }
+            composable(Screen.NewTransaction.route) {
+                val viewModel: NewTransactionViewModel = viewModel(factory = newTransactionViewModelFactory)
+                NewTransactionScreen(navController, viewModel, accountRepository)
+            }
             composable(Screen.Reports.route) { ReportsScreen(navController) }
             composable(Screen.More.route) { MoreScreen(navController) }
         }
