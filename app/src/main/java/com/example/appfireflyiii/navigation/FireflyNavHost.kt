@@ -24,11 +24,9 @@ fun FireflyNavHost(navController: NavHostController) {
 
         composable(Screen.TransactionDetail.route) { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: ""
-            // TransactionDetailScreen(id) — la armamos más adelante
         }
         composable(Screen.CategoryDetail.route) { backStackEntry ->
             val categoryId = backStackEntry.arguments?.getString("categoryId") ?: ""
-            // CategoryDetailScreen(categoryId) — la armamos más adelante
         }
     }
 }

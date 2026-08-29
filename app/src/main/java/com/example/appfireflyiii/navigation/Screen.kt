@@ -15,6 +15,9 @@ sealed class Screen(
     data object Reports : Screen("reports", "Reportes", Icons.Filled.BarChart)
     data object More : Screen("more", "Más", Icons.Filled.Menu)
 
+    data object TokenSetup : Screen("token_setup", "Configurar")
+    data object Login : Screen("login", "Ingresar")
+
     data object TransactionDetail : Screen("transaction_detail/{id}", "Detalle") {
         fun createRoute(id: String) = "transaction_detail/$id"
     }
@@ -22,7 +25,6 @@ sealed class Screen(
         fun createRoute(categoryId: String) = "category_detail/$categoryId"
     }
 }
-
 val bottomNavItems = listOf(
     Screen.Dashboard,
     Screen.Accounts,
