@@ -25,6 +25,11 @@ import com.example.appfireflyiii.data.network.FireflyClient
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.ui.screens.accounts.AccountsViewModel
 import com.example.appfireflyiii.ui.screens.accounts.AccountsViewModelFactory
+import com.example.appfireflyiii.data.repository.TransactionRepository
+import com.example.appfireflyiii.ui.screens.transactions.TransactionsScreen
+import com.example.appfireflyiii.ui.screens.transactions.TransactionsViewModel
+import com.example.appfireflyiii.ui.screens.transactions.TransactionsViewModelFactory
+
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,6 +50,8 @@ fun FireflyApp(activity: FragmentActivity) {
     val fireflyApi = remember { FireflyClient.create { tokenStorage.getToken() } }
     val accountRepository = remember { AccountRepository(fireflyApi) }
     val accountsViewModelFactory = remember { AccountsViewModelFactory(accountRepository) }
+    val transactionRepository = remember { TransactionRepository(fireflyApi) }
+    val transactionsViewModelFactory = remember { TransactionsViewModelFactory(transactionRepository) }
 
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
@@ -80,6 +87,10 @@ fun FireflyApp(activity: FragmentActivity) {
             composable(Screen.Accounts.route) {
                 val viewModel: AccountsViewModel = viewModel(factory = accountsViewModelFactory)
                 AccountsScreen(navController, viewModel)
+            }
+            composable(Screen.Transactions.route) {
+                val viewModel: TransactionsViewModel = viewModel(factory = transactionsViewModelFactory)
+                TransactionsScreen(navController, viewModel)
             }
             composable(Screen.NewTransaction.route) { NewTransactionScreen(navController) }
             composable(Screen.Reports.route) { ReportsScreen(navController) }

@@ -14,6 +14,7 @@ sealed class Screen(
     data object NewTransaction : Screen("new_transaction", "Nueva", Icons.Filled.Add)
     data object Reports : Screen("reports", "Reportes", Icons.Filled.BarChart)
     data object More : Screen("more", "Más", Icons.Filled.Menu)
+    data object Transactions : Screen("transactions", "Transacciones")
 
     data object TokenSetup : Screen("token_setup", "Configurar")
     data object Login : Screen("login", "Ingresar")
