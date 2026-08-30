@@ -39,6 +39,11 @@ import com.example.appfireflyiii.ui.screens.reports.ReportsViewModel
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModelFactory
 import com.example.appfireflyiii.ui.theme.AppFireflyTheme
 import androidx.core.view.WindowCompat
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailScreen
+import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailViewModel
+import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailViewModelFactory
 
 
 class MainActivity : FragmentActivity() {
@@ -121,6 +126,15 @@ fun FireflyApp(activity: FragmentActivity) {
                 ReportsScreen(navController, viewModel)
             }
             composable(Screen.More.route) { MoreScreen(navController) }
+            composable(
+                route = Screen.AccountDetail.route,
+                arguments = listOf(navArgument("accountId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
+                val factory = remember { AccountDetailViewModelFactory(accountRepository, accountId) }
+                val viewModel: AccountDetailViewModel = viewModel(factory = factory)
+                AccountDetailScreen(navController, viewModel)
+            }
         }
     }
 }

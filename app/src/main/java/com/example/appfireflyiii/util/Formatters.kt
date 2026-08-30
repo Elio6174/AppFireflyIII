@@ -2,6 +2,14 @@ package com.example.appfireflyiii.util
 
 import java.util.Locale
 import kotlin.math.abs
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+
+fun Modifier.verticalScrollColumn(): Modifier = composed {
+    this.verticalScroll(rememberScrollState())
+}
 
 fun formatAmount(value: Double, symbol: String?): String {
     val sign = if (value < 0) "-" else ""

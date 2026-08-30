@@ -8,6 +8,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.http.Path
 
 interface FireflyApi {
     @GET("api/v1/accounts")
@@ -30,4 +31,12 @@ interface FireflyApi {
 
     @GET("api/v1/about")
     suspend fun getAbout(): Map<String, Any>
+
+    @GET("api/v1/accounts/{id}/transactions")
+    suspend fun getAccountTransactions(
+        @Path("id") accountId: String,
+        @Query("start") start: String? = null,
+        @Query("end") end: String? = null,
+        @Query("limit") limit: Int = 100
+    ): TransactionResponse
 }

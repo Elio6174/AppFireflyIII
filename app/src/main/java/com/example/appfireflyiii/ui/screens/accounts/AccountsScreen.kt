@@ -34,6 +34,8 @@ import com.example.appfireflyiii.ui.theme.LiabilityColor
 import com.example.appfireflyiii.ui.theme.NeutralAccountColor
 import com.example.appfireflyiii.util.formatAmount
 import com.example.appfireflyiii.util.formatAccountNumber
+import androidx.compose.foundation.clickable
+import com.example.appfireflyiii.navigation.Screen
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -91,7 +93,9 @@ fun AccountsScreen(
                     }
 
                     item {
-                        AccountCardCarousel(assets = assets)
+                        AccountCardCarousel(assets = assets, onAccountClick = { accountId ->
+                            navController.navigate(Screen.AccountDetail.createRoute(accountId))
+                        })
                     }
 
                     item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -136,7 +140,7 @@ fun AccountsScreen(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun AccountCardCarousel(assets: List<AccountData>) {
+fun AccountCardCarousel(assets: List<AccountData>, onAccountClick: (String) -> Unit) {
     val pagerState = rememberPagerState(pageCount = { assets.size })
 
     Column {
@@ -151,16 +155,15 @@ fun AccountCardCarousel(assets: List<AccountData>) {
                 "cashWalletAsset" -> Icons.Filled.AccountBalanceWallet
                 else -> Icons.Filled.CreditCard
             }
-            BankCard(
-                label = account.attributes.name.uppercase(),
-                subtitle = "Cuenta activa",
-                amount = formatAmount(
-                    account.attributes.currentBalance,
-                    account.attributes.currencySymbol
-                ),
-                icon = icon,
-                accountNumber = account.attributes.accountNumber
-            )
+            Box(modifier = Modifier.clickable { onAccountClick(account.id) }) {
+                BankCard(
+                    label = account.attributes.name.uppercase(),
+                    subtitle = "Cuenta activa",
+                    amount = formatAmount(account.attributes.currentBalance, account.attributes.currencySymbol),
+                    icon = icon,
+                    accountNumber = account.attributes.accountNumber
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
