@@ -38,10 +38,16 @@ import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModel
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModelFactory
 import com.example.appfireflyiii.ui.theme.AppFireflyTheme
+import androidx.core.view.WindowCompat
+
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.statusBarColor = android.graphics.Color.parseColor("#232328")
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+
         setContent {
             AppFireflyTheme {
                 FireflyApp(activity = this)

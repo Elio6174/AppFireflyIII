@@ -35,7 +35,8 @@ data class AccountAttributes(
     val interest: String?,
     @SerializedName("interest_period") val interestPeriod: String?,
     @SerializedName("include_net_worth") val includeNetWorth: Boolean?,
-    @SerializedName("last_activity") val lastActivity: String?
+    @SerializedName("last_activity") val lastActivity: String?,
+    @SerializedName("account_number") val accountNumber: String?
 )
 
 data class Meta(

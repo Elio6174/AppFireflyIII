@@ -7,33 +7,35 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+
+private val DarkColors = darkColorScheme(
+    primary = AccentPrimary,
+    onPrimary = Color(0xFF1C1B1F),
+    primaryContainer = CharcoalSurfaceHigh,
+    background = CharcoalBackground,
+    surface = CharcoalSurface,
+    surfaceContainerHigh = CharcoalSurfaceHigh,
+    surfaceVariant = CharcoalSurfaceVariant,
+    onSurface = OnSurfaceDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    error = RedExpense
+)
+
 private val LightColors = lightColorScheme(
-    primary = PurplePrimary,
+    primary = AccentPrimaryLight,
     onPrimary = Color.White,
-    primaryContainer = PurpleContainer,
+    primaryContainer = SurfaceVariantLight,
     background = BackgroundLight,
     surface = SurfaceLight,
     surfaceVariant = SurfaceVariantLight,
     onSurface = OnSurfaceLight,
     onSurfaceVariant = OnSurfaceVariantLight,
-    error = RedExpense
-)
-
-private val DarkColors = darkColorScheme(
-    primary = PurplePrimaryDark,
-    onPrimary = Color(0xFF2E2350),
-    primaryContainer = PurpleContainerDark,
-    background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceVariant = SurfaceVariantDark,
-    onSurface = OnSurfaceDark,
-    onSurfaceVariant = OnSurfaceVariantDark,
-    error = RedExpenseDark
+    error = RedExpenseLight
 )
 
 @Composable
 fun AppFireflyTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors

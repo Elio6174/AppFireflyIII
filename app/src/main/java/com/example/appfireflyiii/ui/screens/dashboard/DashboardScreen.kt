@@ -2,18 +2,31 @@ package com.example.appfireflyiii.ui.screens.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.appfireflyiii.data.model.TransactionSplit
 import com.example.appfireflyiii.navigation.Screen
+import com.example.appfireflyiii.ui.theme.AssetColor
+import com.example.appfireflyiii.ui.theme.RedExpense
+import com.example.appfireflyiii.util.formatAmount
+import androidx.compose.ui.graphics.Color
+import com.example.appfireflyiii.ui.theme.CardGradientEnd
+import com.example.appfireflyiii.ui.theme.CardGradientStart
 
 @Composable
 fun DashboardScreen(
@@ -48,110 +61,173 @@ fun DashboardScreen(
 
 @Composable
 fun DashboardContent(data: DashboardData, navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
-    ) {
-        Text("Resumen", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text("Hola de nuevo", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Card grande de balance total, con gradiente
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(CardGradientStart, CardGradientEnd)
                         )
                     )
+                    .padding(20.dp)
+            ) {
+                Column {
+                    Text(
+                        "Patrimonio neto",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.75f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        formatAmount(data.netWorth.toDouble(), data.currencySymbol),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row {
+                        Text(
+                            "↑ ${formatAmount(data.monthlyIncome.toDouble(), data.currencySymbol)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AssetColor
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            "↓ ${formatAmount(data.monthlyExpense.toDouble(), data.currencySymbol)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = RedExpense
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                QuickAction(
+                    label = "Nueva",
+                    icon = Icons.Filled.Add,
+                    onClick = { navController.navigate(Screen.NewTransaction.route) }
                 )
-                .padding(20.dp)
+                QuickAction(
+                    label = "Cuentas",
+                    icon = Icons.Filled.AccountBalanceWallet,
+                    onClick = { navController.navigate(Screen.Accounts.route) }
+                )
+                QuickAction(
+                    label = "Movimientos",
+                    icon = Icons.Filled.Receipt,
+                    onClick = { navController.navigate(Screen.Transactions.route) }
+                )
+                QuickAction(
+                    label = "Reportes",
+                    icon = Icons.Filled.BarChart,
+                    onClick = { navController.navigate(Screen.Reports.route) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Movimientos recientes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
+                    Text("Ver todo")
+                }
+            }
+        }
+
+        if (data.recentTransactions.isEmpty()) {
+            Text(
+                "Sin movimientos recientes.",
+                modifier = Modifier.padding(20.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                data.recentTransactions.forEach { split ->
+                    RecentTransactionRow(split)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(72.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            IconButton(onClick = onClick) {
+                Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+@Composable
+fun RecentTransactionRow(split: TransactionSplit) {
+    val isExpense = split.type == "withdrawal"
+    val amountColor = if (isExpense) RedExpense else AssetColor
+    val prefix = if (isExpense) "-" else "+"
+    val amountValue = split.amount.toDoubleOrNull() ?: 0.0
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
+                Text(split.description, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "Balance total",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "${data.currencySymbol}${data.totalBalance.setScale(2)}",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    split.categoryName ?: "Sin categoría",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Dos cards lado a lado: ingreso y gasto del mes
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "Ingresos (mes)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "+${data.currencySymbol}${data.monthlyIncome.setScale(2)}",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color(0xFF2E7D32),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "Gastos (mes)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "-${data.currencySymbol}${data.monthlyExpense.setScale(2)}",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text("Acceso rápido", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedButton(
-            onClick = { navController.navigate(Screen.Transactions.route) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Ver todas las transacciones")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = { navController.navigate(Screen.Accounts.route) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Ver cuentas")
+            Text(
+                "$prefix${formatAmount(amountValue, split.currencySymbol)}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = amountColor
+            )
         }
     }
 }

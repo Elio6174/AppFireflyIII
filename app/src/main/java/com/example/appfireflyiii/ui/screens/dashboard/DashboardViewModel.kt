@@ -3,6 +3,7 @@ package com.example.appfireflyiii.ui.screens.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.appfireflyiii.data.model.TransactionSplit
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,10 +15,11 @@ import java.util.Calendar
 import java.util.Locale
 
 data class DashboardData(
-    val totalBalance: BigDecimal,
+    val netWorth: BigDecimal,
     val monthlyIncome: BigDecimal,
     val monthlyExpense: BigDecimal,
-    val currencySymbol: String
+    val currencySymbol: String,
+    val recentTransactions: List<TransactionSplit>
 )
 
 sealed class DashboardUiState {
@@ -44,7 +46,8 @@ class DashboardViewModel(
 
             val accountsResult = accountRepository.getAccounts()
             val (start, end) = currentMonthRange()
-            val transactionsResult = transactionRepository.getTransactionsByRange(start, end)
+            val monthTransactionsResult = transactionRepository.getTransactionsByRange(start, end)
+            val recentResult = transactionRepository.getTransactions(page = 1)
 
             if (accountsResult.isFailure) {
                 _uiState.value = DashboardUiState.Error(
@@ -52,24 +55,24 @@ class DashboardViewModel(
                 )
                 return@launch
             }
-            if (transactionsResult.isFailure) {
+            if (monthTransactionsResult.isFailure) {
                 _uiState.value = DashboardUiState.Error(
-                    transactionsResult.exceptionOrNull()?.message ?: "Error al cargar transacciones"
+                    monthTransactionsResult.exceptionOrNull()?.message ?: "Error al cargar transacciones"
                 )
                 return@launch
             }
 
             val accounts = accountsResult.getOrThrow()
-            val transactionGroups = transactionsResult.getOrThrow()
+            val transactionGroups = monthTransactionsResult.getOrThrow()
 
-            // Balance total: solo cuentas tipo "asset" (las de dinero real disponible)
-            val assetAccounts = accounts.filter { it.attributes.type == "asset" }
-            val totalBalance = assetAccounts.fold(BigDecimal.ZERO) { acc, account ->
+            val netWorthAccounts = accounts.filter {
+                it.attributes.type == "asset" || it.attributes.type == "liabilities" || it.attributes.type == "liability"
+            }
+            val netWorth = netWorthAccounts.fold(BigDecimal.ZERO) { acc, account ->
                 acc + (account.attributes.currentBalance.toBigDecimalOrNull() ?: BigDecimal.ZERO)
             }
-            val currencySymbol = assetAccounts.firstOrNull()?.attributes?.currencySymbol ?: "$"
+            val currencySymbol = netWorthAccounts.firstOrNull()?.attributes?.currencySymbol ?: "$"
 
-            // Gasto e ingreso del mes, recorriendo todos los splits de cada grupo
             var income = BigDecimal.ZERO
             var expense = BigDecimal.ZERO
             transactionGroups.forEach { group ->
@@ -82,12 +85,19 @@ class DashboardViewModel(
                 }
             }
 
+            val recentSplits = recentResult.getOrNull()
+                ?.flatMap { it.attributes.transactions }
+                ?.sortedByDescending { it.date }
+                ?.take(5)
+                ?: emptyList()
+
             _uiState.value = DashboardUiState.Success(
                 DashboardData(
-                    totalBalance = totalBalance,
+                    netWorth = netWorth,
                     monthlyIncome = income,
                     monthlyExpense = expense,
-                    currencySymbol = currencySymbol
+                    currencySymbol = currencySymbol,
+                    recentTransactions = recentSplits
                 )
             )
         }
@@ -96,13 +106,10 @@ class DashboardViewModel(
     private fun currentMonthRange(): Pair<String, String> {
         val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val calendar = Calendar.getInstance()
-
         calendar.set(Calendar.DAY_OF_MONTH, 1)
         val start = format.format(calendar.time)
-
         calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
         val end = format.format(calendar.time)
-
         return start to end
     }
 }
