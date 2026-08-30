@@ -27,28 +27,52 @@ import com.example.appfireflyiii.util.formatAmount
 import androidx.compose.ui.graphics.Color
 import com.example.appfireflyiii.ui.theme.CardGradientEnd
 import com.example.appfireflyiii.ui.theme.CardGradientStart
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     navController: NavController,
     viewModel: DashboardViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    LaunchedEffect(uiState) {
+        if (uiState !is DashboardUiState.Loading) {
+            isRefreshing = false
+        }
+    }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.loadDashboard()
+        },
+        modifier = Modifier.fillMaxSize()
+    ) {
         when (val state = uiState) {
             is DashboardUiState.Loading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                if (!isRefreshing) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                }
             }
             is DashboardUiState.Error -> {
-                Column(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("No se pudo cargar: ${state.message}")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { viewModel.loadDashboard() }) {
-                        Text("Reintentar")
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("No se pudo cargar: ${state.message}")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = { viewModel.loadDashboard() }) {
+                            Text("Reintentar")
+                        }
                     }
                 }
             }
@@ -61,7 +85,11 @@ fun DashboardScreen(
 
 @Composable
 fun DashboardContent(data: DashboardData, navController: NavController) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text("Hola de nuevo", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
