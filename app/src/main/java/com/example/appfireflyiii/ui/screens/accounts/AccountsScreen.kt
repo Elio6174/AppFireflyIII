@@ -36,6 +36,10 @@ import com.example.appfireflyiii.util.formatAmount
 import com.example.appfireflyiii.util.formatAccountNumber
 import androidx.compose.foundation.clickable
 import com.example.appfireflyiii.navigation.Screen
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Add
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -84,16 +88,38 @@ fun AccountsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     item {
-                        Text(
-                            "Tus cuentas",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Tus cuentas",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable { navController.navigate(Screen.CreateAccount.route) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = "Nueva cuenta",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
 
                     item {
-                        AccountCardCarousel(assets = assets, onAccountClick = { accountId ->
+                        AccountCardCarousel(assets = assets, navController = navController, onAccountClick = { accountId ->
                             navController.navigate(Screen.AccountDetail.createRoute(accountId))
                         })
                     }
@@ -140,7 +166,7 @@ fun AccountsScreen(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun AccountCardCarousel(assets: List<AccountData>, onAccountClick: (String) -> Unit) {
+fun AccountCardCarousel(assets: List<AccountData>, navController: NavController, onAccountClick: (String) -> Unit) {
     val pagerState = rememberPagerState(pageCount = { assets.size })
 
     Column {
@@ -161,7 +187,10 @@ fun AccountCardCarousel(assets: List<AccountData>, onAccountClick: (String) -> U
                     subtitle = "Cuenta activa",
                     amount = formatAmount(account.attributes.currentBalance, account.attributes.currencySymbol),
                     icon = icon,
-                    accountNumber = account.attributes.accountNumber
+                    accountNumber = account.attributes.accountNumber,
+                    onEditClick = {
+                        navController.navigate(Screen.EditAccount.createRoute(account.id))
+                    }
                 )
             }
         }
@@ -195,7 +224,9 @@ fun BankCard(
     subtitle: String,
     amount: String,
     icon: ImageVector,
-    accountNumber: String? = null
+    accountNumber: String? = null,
+    onEditClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -240,14 +271,57 @@ fun BankCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Row {
+                    if (onDeleteClick != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEF4444))
+                                .clickable { onDeleteClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Eliminar cuenta",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
+                    if (onEditClick != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF3B82F6))
+                                .clickable { onEditClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "Editar cuenta",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
 

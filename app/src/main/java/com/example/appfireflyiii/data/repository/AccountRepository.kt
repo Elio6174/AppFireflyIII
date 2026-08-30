@@ -1,6 +1,8 @@
 package com.example.appfireflyiii.data.repository
 
 import com.example.appfireflyiii.data.model.AccountData
+import com.example.appfireflyiii.data.model.AccountStoreRequest
+import com.example.appfireflyiii.data.model.AccountUpdateRequest
 import com.example.appfireflyiii.data.model.TransactionGroup
 import com.example.appfireflyiii.data.network.FireflyApi
 
@@ -24,6 +26,33 @@ class AccountRepository(private val api: FireflyApi) {
         return try {
             val response = api.getAccountTransactions(accountId, start, end)
             Result.success(response.data)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateAccount(accountId: String, request: AccountUpdateRequest): Result<Unit> {
+        return try {
+            api.updateAccount(accountId, request)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteAccount(accountId: String): Result<Unit> {
+        return try {
+            api.deleteAccount(accountId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createAccount(request: AccountStoreRequest): Result<Unit> {
+        return try {
+            api.createAccount(request)
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

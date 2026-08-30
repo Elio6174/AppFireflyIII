@@ -44,6 +44,12 @@ import androidx.navigation.navArgument
 import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailScreen
 import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailViewModel
 import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailViewModelFactory
+import com.example.appfireflyiii.ui.screens.editaccount.EditAccountScreen
+import com.example.appfireflyiii.ui.screens.editaccount.EditAccountViewModel
+import com.example.appfireflyiii.ui.screens.editaccount.EditAccountViewModelFactory
+import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountScreen
+import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountViewModel
+import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountViewModelFactory
 
 
 class MainActivity : FragmentActivity() {
@@ -131,9 +137,22 @@ fun FireflyApp(activity: FragmentActivity) {
                 arguments = listOf(navArgument("accountId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
-                val factory = remember { AccountDetailViewModelFactory(accountRepository, accountId) }
-                val viewModel: AccountDetailViewModel = viewModel(factory = factory)
-                AccountDetailScreen(navController, viewModel)
+                AccountDetailScreen(navController, accountId, accountRepository)
+            }
+            composable(
+                route = Screen.EditAccount.route,
+                arguments = listOf(navArgument("accountId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
+                val factory = remember(accountId) { EditAccountViewModelFactory(accountRepository, accountId) }
+                val viewModel: EditAccountViewModel = viewModel(key = accountId, factory = factory)
+                EditAccountScreen(navController, viewModel)
+            }
+
+            composable(Screen.CreateAccount.route) {
+                val factory = remember { CreateAccountViewModelFactory(accountRepository) }
+                val viewModel: CreateAccountViewModel = viewModel(factory = factory)
+                CreateAccountScreen(navController, viewModel)
             }
         }
     }

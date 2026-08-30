@@ -2,49 +2,60 @@ package com.example.appfireflyiii.ui.screens.accountdetail
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.appfireflyiii.data.model.AccountData
 import com.example.appfireflyiii.data.model.TransactionSplit
-import com.example.appfireflyiii.ui.theme.AssetColor
-import com.example.appfireflyiii.ui.theme.CardGradientEnd
-import com.example.appfireflyiii.ui.theme.CardGradientStart
-import com.example.appfireflyiii.ui.theme.RedExpense
-import com.example.appfireflyiii.util.formatAmount
-import com.example.appfireflyiii.util.verticalScrollColumn
-import com.example.appfireflyiii.util.formatRelativeDate
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
-import androidx.compose.material.icons.filled.ArrowForward
+import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.navigation.Screen
+import com.example.appfireflyiii.ui.screens.accounts.BankCard
+import com.example.appfireflyiii.ui.theme.AssetColor
+import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.currentMonthLabel
+import com.example.appfireflyiii.util.formatAmount
+import com.example.appfireflyiii.util.formatRelativeDate
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.composed
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AccountDetailScreen(
     navController: NavController,
-    viewModel: AccountDetailViewModel
+    initialAccountId: String,
+    accountRepository: AccountRepository
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    var assetAccounts by remember { mutableStateOf<List<AccountData>?>(null) }
+
+    LaunchedEffect(Unit) {
+        accountRepository.getAccounts().onSuccess { accounts ->
+            assetAccounts = accounts.filter { it.attributes.type == "asset" }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -57,35 +68,67 @@ fun AccountDetailScreen(
             Text("Detalle de cuenta", style = MaterialTheme.typography.titleMedium)
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (val state = uiState) {
-                is AccountDetailUiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                is AccountDetailUiState.Error -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("No se pudo cargar: ${state.message}")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = { viewModel.load() }) {
-                            Text("Reintentar")
-                        }
-                    }
-                }
-                is AccountDetailUiState.Success -> {
-                    AccountDetailContent(state.data, navController)
-                }
+        val accounts = assetAccounts
+        if (accounts == null) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            return@Column
+        }
+        if (accounts.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Text("No hay cuentas para mostrar.", modifier = Modifier.align(Alignment.Center))
+            }
+            return@Column
+        }
+
+        val initialPage = accounts.indexOfFirst { it.id == initialAccountId }.coerceAtLeast(0)
+        val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { accounts.size })
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val account = accounts[page]
+            val factory = remember(account.id) { AccountDetailViewModelFactory(accountRepository, account.id) }
+            val viewModel: AccountDetailViewModel = viewModel(key = account.id, factory = factory)
+
+            AccountDetailPageContent(account, viewModel, navController)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            repeat(accounts.size) { index ->
+                val selected = pagerState.currentPage == index
+                Box(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .size(if (selected) 8.dp else 6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                )
             }
         }
     }
 }
 
 @Composable
-fun AccountDetailContent(data: AccountDetailData, navController: NavController) {
-    val attrs = data.account.attributes
-    val balance = attrs.currentBalance.toDoubleOrNull() ?: 0.0
+fun AccountDetailPageContent(
+    account: AccountData,
+    viewModel: AccountDetailViewModel,
+    navController: NavController
+) {
+    val attrs = account.attributes
+    val icon = when (attrs.accountRole) {
+        "cashWalletAsset" -> Icons.Filled.AccountBalanceWallet
+        else -> Icons.Filled.CreditCard
+    }
+    val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -93,88 +136,87 @@ fun AccountDetailContent(data: AccountDetailData, navController: NavController) 
             .verticalScrollColumn()
             .padding(horizontal = 20.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(Brush.linearGradient(colors = listOf(CardGradientStart, CardGradientEnd)))
-                .padding(20.dp)
-        ) {
-            Column {
-                Text(
-                    attrs.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.75f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    formatAmount(balance, attrs.currencySymbol),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
+        BankCard(
+            label = attrs.name.uppercase(),
+            subtitle = "Cuenta activa",
+            amount = formatAmount(attrs.currentBalance, attrs.currencySymbol),
+            icon = icon,
+            accountNumber = attrs.accountNumber
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Evolución del mes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                currentMonthLabel(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "Aproximado, reconstruido a partir de los movimientos del mes",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        BalanceLineChart(data.dailyBalance, attrs.currencySymbol)
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Movimientos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
-                Text("Ver todos")
-                Spacer(modifier = Modifier.width(2.dp))
-                Icon(
-                    Icons.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
+        when (val state = uiState) {
+            is AccountDetailUiState.Loading -> {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
             }
-        }
-        Spacer(modifier = Modifier.height(12.dp))
+            is AccountDetailUiState.Error -> {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)) {
+                    Text("No se pudo cargar: ${state.message}")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { viewModel.load() }) {
+                        Text("Reintentar")
+                    }
+                }
+            }
+            is AccountDetailUiState.Success -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Evolución del mes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        currentMonthLabel(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Aproximado, reconstruido a partir de los movimientos del mes",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
 
-        if (data.transactions.isEmpty()) {
-            Text(
-                "Sin movimientos este mes.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 20.dp)
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                data.transactions.forEach { split ->
-                    AccountTransactionRow(split)
+                BalanceLineChart(state.data.dailyBalance, attrs.currencySymbol)
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Movimientos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
+                        Text("Ver todos")
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(Icons.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (state.data.transactions.isEmpty()) {
+                    Text(
+                        "Sin movimientos este mes.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 20.dp)
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        state.data.transactions.forEach { split ->
+                            AccountTransactionRow(split)
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(100.dp)) // deja espacio para que la bottom nav no tape el último item
+        Spacer(modifier = Modifier.height(100.dp))
     }
 }
 
@@ -199,12 +241,8 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
                 .height(200.dp)
                 .pointerInput(values) {
                     detectDragGestures(
-                        onDragStart = { offset ->
-                            selectedIndex = nearestIndex(offset.x, canvasSize.width, values.size)
-                        },
-                        onDrag = { change, _ ->
-                            selectedIndex = nearestIndex(change.position.x, canvasSize.width, values.size)
-                        },
+                        onDragStart = { offset -> selectedIndex = nearestIndex(offset.x, canvasSize.width, values.size) },
+                        onDrag = { change, _ -> selectedIndex = nearestIndex(change.position.x, canvasSize.width, values.size) },
                         onDragEnd = { selectedIndex = null }
                     )
                 }
@@ -232,13 +270,7 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
             selectedIndex?.let { idx ->
                 val x = idx * stepX
                 val y = size.height - ((values[idx] - minValue) / range) * size.height
-
-                drawLine(
-                    color = lineColor.copy(alpha = 0.4f),
-                    start = Offset(x, 0f),
-                    end = Offset(x, size.height),
-                    strokeWidth = 2f
-                )
+                drawLine(color = lineColor.copy(alpha = 0.4f), start = Offset(x, 0f), end = Offset(x, size.height), strokeWidth = 2f)
                 drawCircle(color = lineColor, radius = 8f, center = Offset(x, y))
                 drawCircle(color = Color.White, radius = 3f, center = Offset(x, y))
             }
@@ -258,11 +290,7 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Column {
-                    Text(
-                        "Día ${idx + 1}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
-                    )
+                    Text("Día ${idx + 1}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f))
                     Text(
                         formatAmount(values[idx].toDouble(), currencySymbol),
                         style = MaterialTheme.typography.labelLarge,
@@ -278,13 +306,11 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
 private fun nearestIndex(touchX: Float, canvasWidth: Float, count: Int): Int {
     if (canvasWidth <= 0f || count < 2) return 0
     val stepX = canvasWidth / (count - 1)
-    val index = (touchX / stepX).toInt()
-    return index.coerceIn(0, count - 1)
+    return (touchX / stepX).toInt().coerceIn(0, count - 1)
 }
 
 @Composable
 fun AccountTransactionRow(split: TransactionSplit) {
-    val isExpense = split.type == "withdrawal"
     val amountColor = when (split.type) {
         "withdrawal" -> RedExpense
         "deposit" -> AssetColor
@@ -309,12 +335,7 @@ fun AccountTransactionRow(split: TransactionSplit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    split.description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(split.description, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     "${split.categoryName ?: "Sin categoría"} · ${formatRelativeDate(split.date)}",
                     style = MaterialTheme.typography.bodySmall,
@@ -330,4 +351,8 @@ fun AccountTransactionRow(split: TransactionSplit) {
             )
         }
     }
+}
+
+private fun Modifier.verticalScrollColumn(): Modifier = composed {
+    this.verticalScroll(androidx.compose.foundation.rememberScrollState())
 }

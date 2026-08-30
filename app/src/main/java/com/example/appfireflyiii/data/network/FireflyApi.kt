@@ -1,6 +1,9 @@
 package com.example.appfireflyiii.data.network
 
 import com.example.appfireflyiii.data.model.AccountResponse
+import com.example.appfireflyiii.data.model.AccountSingleResponse
+import com.example.appfireflyiii.data.model.AccountStoreRequest
+import com.example.appfireflyiii.data.model.AccountUpdateRequest
 import com.example.appfireflyiii.data.model.TransactionResponse
 import com.example.appfireflyiii.data.model.TransactionStoreRequest
 import com.example.appfireflyiii.data.model.TransactionStoreResponse
@@ -9,6 +12,8 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Path
+import retrofit2.http.PUT
+import retrofit2.http.DELETE
 
 interface FireflyApi {
     @GET("api/v1/accounts")
@@ -39,4 +44,16 @@ interface FireflyApi {
         @Query("end") end: String? = null,
         @Query("limit") limit: Int = 100
     ): TransactionResponse
+
+    @PUT("api/v1/accounts/{id}")
+    suspend fun updateAccount(
+        @Path("id") id: String,
+        @Body body: AccountUpdateRequest
+    ): AccountSingleResponse
+
+    @DELETE("api/v1/accounts/{id}")
+    suspend fun deleteAccount(@Path("id") id: String)
+
+    @POST("api/v1/accounts")
+    suspend fun createAccount(@Body body: AccountStoreRequest): AccountSingleResponse
 }

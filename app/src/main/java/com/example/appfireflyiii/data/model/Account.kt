@@ -56,3 +56,29 @@ data class ResponseLinks(
     val first: String?,
     val last: String?
 )
+
+data class AccountUpdateRequest(
+    val name: String,
+    @SerializedName("account_number") val accountNumber: String? = null,
+    @SerializedName("account_role") val accountRole: String? = null,
+    val notes: String? = null,
+    val active: Boolean = true,
+    @SerializedName("include_net_worth") val includeNetWorth: Boolean = true
+)
+
+data class AccountSingleResponse(
+    val data: AccountData
+)
+
+data class AccountStoreRequest(
+    val name: String,
+    val type: String = "asset",
+    @SerializedName("account_role") val accountRole: String? = "defaultAsset",
+    @SerializedName("currency_code") val currencyCode: String? = "MXN",
+    @SerializedName("opening_balance") val openingBalance: String? = null,
+    @SerializedName("opening_balance_date") val openingBalanceDate: String? = null,
+    @SerializedName("account_number") val accountNumber: String? = null,
+    val notes: String? = null,
+    val active: Boolean = true,
+    @SerializedName("include_net_worth") val includeNetWorth: Boolean = true
+)

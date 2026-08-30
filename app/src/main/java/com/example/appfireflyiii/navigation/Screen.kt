@@ -28,6 +28,11 @@ sealed class Screen(
     data object AccountDetail : Screen("account_detail/{accountId}", "Detalle de cuenta") {
         fun createRoute(accountId: String) = "account_detail/$accountId"
     }
+    data object EditAccount : Screen("edit_account/{accountId}", "Editar cuenta") {
+        fun createRoute(accountId: String) = "edit_account/$accountId"
+    }
+
+    data object CreateAccount : Screen("create_account", "Nueva cuenta")
 }
 val bottomNavItems = listOf(
     Screen.Dashboard,
