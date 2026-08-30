@@ -23,9 +23,9 @@ data class TransactionGroupAttributes(
 
 data class TransactionSplit(
     @SerializedName("transaction_journal_id") val journalId: String?,
-    val type: String, // "withdrawal", "deposit", "transfer"
+    val type: String,
     val date: String,
-    val amount: String, // viene como String, igual que en Accounts
+    val amount: String,
     val description: String,
     @SerializedName("currency_symbol") val currencySymbol: String?,
     @SerializedName("currency_decimal_places") val currencyDecimalPlaces: Int?,
@@ -40,23 +40,30 @@ data class TransactionSplit(
     val notes: String?
 )
 
+data class TransactionStoreResponse(
+    val data: TransactionGroup
+)
+
 data class TransactionStoreRequest(
     @SerializedName("error_if_duplicate_hash") val errorIfDuplicateHash: Boolean = true,
+    @SerializedName("apply_rules") val applyRules: Boolean = true,
+    @SerializedName("fire_webhooks") val fireWebhooks: Boolean = true,
     val transactions: List<TransactionSplitRequest>
 )
 
-data class TransactionStoreResponse(
-    val data: TransactionGroup // OJO: aquí es un objeto solo, no una List<>
-)
-
 data class TransactionSplitRequest(
-    val type: String, // "withdrawal", "deposit", "transfer"
-    val date: String, // formato "yyyy-MM-dd"
+    val type: String,
+    val date: String,
     val amount: String,
     val description: String,
     @SerializedName("source_id") val sourceId: String? = null,
     @SerializedName("source_name") val sourceName: String? = null,
     @SerializedName("destination_id") val destinationId: String? = null,
     @SerializedName("destination_name") val destinationName: String? = null,
-    @SerializedName("category_name") val categoryName: String? = null
+    @SerializedName("category_name") val categoryName: String? = null,
+    @SerializedName("budget_name") val budgetName: String? = null,
+    val notes: String? = null,
+    val tags: List<String>? = null,
+    @SerializedName("foreign_amount") val foreignAmount: String? = null,
+    @SerializedName("foreign_currency_code") val foreignCurrencyCode: String? = null
 )

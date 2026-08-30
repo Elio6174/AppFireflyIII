@@ -211,7 +211,7 @@ fun EditAccountForm(
         Button(
             onClick = { onSave(name, accountNumber, accountRole, notes, includeNetWorth, active) },
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(10.dp),
             enabled = !isSaving && name.isNotBlank()
         ) {
             if (isSaving) {
@@ -254,7 +254,7 @@ fun EditAccountForm(
                         OutlinedButton(
                             onClick = { showDeleteConfirm = false },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp)
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Text("Cancelar")
                         }
@@ -264,7 +264,7 @@ fun EditAccountForm(
                                 onDelete()
                             },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                         ) {
                             Text("Eliminar", color = Color.White, fontWeight = FontWeight.SemiBold)
@@ -281,7 +281,8 @@ fun SleekTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    minLines: Int = 1
+    minLines: Int = 1,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
 ) {
     TextField(
         value = value,
@@ -289,7 +290,8 @@ fun SleekTextField(
         label = { Text(label) },
         modifier = Modifier.fillMaxWidth(),
         minLines = minLines,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(10.dp),
+        keyboardOptions = keyboardOptions,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -305,7 +307,7 @@ fun SleekTextField(
 fun FormSection(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {

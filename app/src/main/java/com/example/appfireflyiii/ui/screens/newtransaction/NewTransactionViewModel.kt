@@ -33,7 +33,14 @@ class NewTransactionViewModel(
         destinationName: String?,
         sourceName: String?,
         destinationId: String?,
-        categoryName: String?
+        categoryName: String?,
+        budgetName: String?,
+        notes: String?,
+        tags: List<String>?,
+        foreignAmount: String?,
+        foreignCurrencyCode: String?,
+        applyRules: Boolean,
+        fireWebhooks: Boolean
     ) {
         viewModelScope.launch {
             _saveState.value = SaveState.Saving
@@ -46,11 +53,22 @@ class NewTransactionViewModel(
                 sourceId = sourceId,
                 sourceName = sourceName,
                 destinationId = destinationId,
-                destinationName = destinationName,
-                categoryName = categoryName?.ifBlank { null }
+                destinationName = destinationName?.ifBlank { null },
+                categoryName = categoryName?.ifBlank { null },
+                budgetName = budgetName?.ifBlank { null },
+                notes = notes?.ifBlank { null },
+                tags = tags?.takeIf { it.isNotEmpty() },
+                foreignAmount = foreignAmount?.ifBlank { null },
+                foreignCurrencyCode = foreignCurrencyCode?.ifBlank { null }
             )
 
-            repository.createTransaction(TransactionStoreRequest(transactions = listOf(split)))
+            val request = TransactionStoreRequest(
+                applyRules = applyRules,
+                fireWebhooks = fireWebhooks,
+                transactions = listOf(split)
+            )
+
+            repository.createTransaction(request)
                 .onSuccess { _saveState.value = SaveState.Success }
                 .onFailure { _saveState.value = SaveState.Error(it.message ?: "Error al guardar") }
         }

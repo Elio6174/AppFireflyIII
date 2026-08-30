@@ -7,6 +7,7 @@ import com.example.appfireflyiii.data.model.AccountUpdateRequest
 import com.example.appfireflyiii.data.model.TransactionResponse
 import com.example.appfireflyiii.data.model.TransactionStoreRequest
 import com.example.appfireflyiii.data.model.TransactionStoreResponse
+import com.example.appfireflyiii.data.model.BudgetResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -56,4 +57,7 @@ interface FireflyApi {
 
     @POST("api/v1/accounts")
     suspend fun createAccount(@Body body: AccountStoreRequest): AccountSingleResponse
+
+    @GET("api/v1/budgets")
+    suspend fun getBudgets(): BudgetResponse
 }
