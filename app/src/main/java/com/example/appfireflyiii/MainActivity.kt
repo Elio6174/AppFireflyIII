@@ -34,7 +34,9 @@ import com.example.appfireflyiii.ui.screens.dashboard.DashboardViewModelFactory
 import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionScreen
 import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewModel
 import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewModelFactory
-
+import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
+import com.example.appfireflyiii.ui.screens.reports.ReportsViewModel
+import com.example.appfireflyiii.ui.screens.reports.ReportsViewModelFactory
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,6 +61,7 @@ fun FireflyApp(activity: FragmentActivity) {
     val transactionsViewModelFactory = remember { TransactionsViewModelFactory(transactionRepository) }
     val dashboardViewModelFactory = remember { DashboardViewModelFactory(accountRepository, transactionRepository) }
     val newTransactionViewModelFactory = remember { NewTransactionViewModelFactory(transactionRepository) }
+    val reportsViewModelFactory = remember { ReportsViewModelFactory(transactionRepository) }
 
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
@@ -106,7 +109,10 @@ fun FireflyApp(activity: FragmentActivity) {
                 val viewModel: NewTransactionViewModel = viewModel(factory = newTransactionViewModelFactory)
                 NewTransactionScreen(navController, viewModel, accountRepository)
             }
-            composable(Screen.Reports.route) { ReportsScreen(navController) }
+            composable(Screen.Reports.route) {
+                val viewModel: ReportsViewModel = viewModel(factory = reportsViewModelFactory)
+                ReportsScreen(navController, viewModel)
+            }
             composable(Screen.More.route) { MoreScreen(navController) }
         }
     }

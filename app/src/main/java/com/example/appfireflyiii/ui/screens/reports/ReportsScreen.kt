@@ -1,16 +1,204 @@
 package com.example.appfireflyiii.ui.screens.reports
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 
+private val chartColors = listOf(
+    Color(0xFF6750A4), Color(0xFF4CAF50), Color(0xFFFF9800),
+    Color(0xFF2196F3), Color(0xFFE91E63), Color(0xFF9E9E9E)
+)
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun ReportsScreen(navController: NavController) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) { Text("Reportes — próximamente") }
+fun ReportsScreen(
+    navController: NavController,
+    viewModel: ReportsViewModel
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (val state = uiState) {
+            is ReportsUiState.Loading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            is ReportsUiState.Error -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("No se pudo cargar: ${state.message}")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { viewModel.loadReports() }) {
+                        Text("Reintentar")
+                    }
+                }
+            }
+            is ReportsUiState.Success -> {
+                val pagerState = rememberPagerState(pageCount = { 2 })
+
+                Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        repeat(2) { index ->
+                            val selected = pagerState.currentPage == index
+                            Box(
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .size(if (selected) 10.dp else 8.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        when (page) {
+                            0 -> CategoryBreakdownPage(state.data)
+                            1 -> DailySpendPage(state.data)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryBreakdownPage(data: ReportsData) {
+    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        Text("Gastos por categoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Total del mes: ${data.currencySymbol}${data.totalExpense.setScale(2)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (data.categories.isEmpty()) {
+            Text("Sin gastos registrados este mes.")
+        }
+
+        data.categories.forEachIndexed { index, category ->
+            val color = chartColors[index % chartColors.size]
+            Column(modifier = Modifier.padding(bottom = 16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(category.name, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "${data.currencySymbol}${category.amount.setScale(2)}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(category.fraction.coerceIn(0.02f, 1f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(color)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DailySpendPage(data: ReportsData) {
+    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        Text("Gasto por día", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Este mes",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        val barColor = MaterialTheme.colorScheme.primary
+        val values = data.dailySpend
+        val maxValue = values.maxOrNull()?.takeIf { it > 0f } ?: 1f
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+        ) {
+            if (values.isEmpty()) return@Canvas
+
+            val barCount = values.size
+            val gap = 2.dp.toPx()
+            val barWidth = (size.width - gap * (barCount - 1)) / barCount
+
+            values.forEachIndexed { index, value ->
+                val barHeight = (value / maxValue) * size.height
+                val left = index * (barWidth + gap)
+                val top = size.height - barHeight
+
+                drawRect(
+                    color = barColor,
+                    topLeft = Offset(left, top),
+                    size = Size(barWidth, barHeight)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("1", style = MaterialTheme.typography.labelSmall)
+            Text("${values.size}", style = MaterialTheme.typography.labelSmall)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        val peakDay = values.indexOf(values.maxOrNull() ?: 0f) + 1
+        val peakAmount = values.maxOrNull() ?: 0f
+        if (peakAmount > 0f) {
+            Text(
+                "Día con más gasto: día $peakDay (${data.currencySymbol}${"%.2f".format(peakAmount)})",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
 }
