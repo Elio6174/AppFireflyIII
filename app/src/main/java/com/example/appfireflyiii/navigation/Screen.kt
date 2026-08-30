@@ -19,8 +19,8 @@ sealed class Screen(
     data object TokenSetup : Screen("token_setup", "Configurar")
     data object Login : Screen("login", "Ingresar")
 
-    data object TransactionDetail : Screen("transaction_detail/{id}", "Detalle") {
-        fun createRoute(id: String) = "transaction_detail/$id"
+    data object TransactionDetail : Screen("transaction_detail/{groupId}/{journalId}", "Detalle") {
+        fun createRoute(groupId: String, journalId: String) = "transaction_detail/$groupId/$journalId"
     }
     data object CategoryDetail : Screen("category_detail/{categoryId}", "Categoría") {
         fun createRoute(categoryId: String) = "category_detail/$categoryId"

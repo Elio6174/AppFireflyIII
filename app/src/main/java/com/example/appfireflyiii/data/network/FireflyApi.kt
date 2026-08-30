@@ -7,6 +7,7 @@ import com.example.appfireflyiii.data.model.AccountUpdateRequest
 import com.example.appfireflyiii.data.model.TransactionResponse
 import com.example.appfireflyiii.data.model.TransactionStoreRequest
 import com.example.appfireflyiii.data.model.TransactionStoreResponse
+import com.example.appfireflyiii.data.model.TransactionUpdateRequest
 import com.example.appfireflyiii.data.model.BudgetResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -34,6 +35,18 @@ interface FireflyApi {
 
     @POST("api/v1/transactions")
     suspend fun createTransaction(@Body body: TransactionStoreRequest): TransactionStoreResponse
+
+    @GET("api/v1/transactions/{id}")
+    suspend fun getTransaction(@Path("id") id: String): TransactionStoreResponse
+
+    @PUT("api/v1/transactions/{id}")
+    suspend fun updateTransaction(
+        @Path("id") id: String,
+        @Body body: TransactionUpdateRequest
+    ): TransactionStoreResponse
+
+    @DELETE("api/v1/transactions/{id}")
+    suspend fun deleteTransaction(@Path("id") id: String)
 
     @GET("api/v1/about")
     suspend fun getAbout(): Map<String, Any>

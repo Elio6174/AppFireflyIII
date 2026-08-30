@@ -1,5 +1,6 @@
 package com.example.appfireflyiii.ui.screens.transactions
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,18 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.appfireflyiii.data.model.TransactionGroup
 import com.example.appfireflyiii.data.model.TransactionSplit
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.ui.draw.clip
+import com.example.appfireflyiii.navigation.Screen
 import com.example.appfireflyiii.ui.theme.AssetColor
 import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.formatAmount
@@ -90,7 +86,15 @@ fun TransactionsScreen(
                             ) {
                                 items(state.transactions) { group ->
                                     group.attributes.transactions.forEach { split ->
-                                        TransactionCard(split)
+                                        TransactionCard(
+                                            transaction = split,
+                                            onClick = {
+                                                val journalId = split.journalId ?: return@TransactionCard
+                                                navController.navigate(
+                                                    Screen.TransactionDetail.createRoute(group.id, journalId)
+                                                )
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -133,13 +137,16 @@ fun MonthSelector(
 }
 
 @Composable
-fun TransactionCard(transaction: TransactionSplit) {
+fun TransactionCard(
+    transaction: TransactionSplit,
+    onClick: () -> Unit = {}
+) {
     val isExpense = transaction.type == "withdrawal"
     val amountColor = if (isExpense) RedExpense else AssetColor
     val amountPrefix = if (isExpense) "-" else "+"
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -148,21 +155,6 @@ fun TransactionCard(transaction: TransactionSplit) {
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(amountColor.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isExpense) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-                    contentDescription = null,
-                    tint = amountColor,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     transaction.description,
@@ -175,6 +167,7 @@ fun TransactionCard(transaction: TransactionSplit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 "$amountPrefix${formatAmount(transaction.amount, transaction.currencySymbol)}",
                 style = MaterialTheme.typography.bodyLarge,

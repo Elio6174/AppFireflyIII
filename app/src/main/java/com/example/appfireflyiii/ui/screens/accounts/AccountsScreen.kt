@@ -40,6 +40,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -181,7 +183,13 @@ fun AccountCardCarousel(assets: List<AccountData>, navController: NavController,
                 "cashWalletAsset" -> Icons.Filled.AccountBalanceWallet
                 else -> Icons.Filled.CreditCard
             }
-            Box(modifier = Modifier.clickable { onAccountClick(account.id) }) {
+            val interactionSource = remember { MutableInteractionSource() }
+            Box(
+                modifier = Modifier.clickable(
+                    interactionSource = interactionSource,
+                    indication = null
+                ) { onAccountClick(account.id) }
+            ) {
                 BankCard(
                     label = account.attributes.name.uppercase(),
                     subtitle = "Cuenta activa",

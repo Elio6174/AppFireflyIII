@@ -51,6 +51,9 @@ import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountScreen
 import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountViewModel
 import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountViewModelFactory
 import com.example.appfireflyiii.data.repository.BudgetRepository
+import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailScreen
+import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModel
+import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModelFactory
 
 
 class MainActivity : FragmentActivity() {
@@ -149,6 +152,22 @@ fun FireflyApp(activity: FragmentActivity) {
                 val factory = remember(accountId) { EditAccountViewModelFactory(accountRepository, accountId) }
                 val viewModel: EditAccountViewModel = viewModel(key = accountId, factory = factory)
                 EditAccountScreen(navController, viewModel)
+            }
+
+            composable(
+                route = Screen.TransactionDetail.route,
+                arguments = listOf(
+                    navArgument("groupId") { type = NavType.StringType },
+                    navArgument("journalId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
+                val journalId = backStackEntry.arguments?.getString("journalId") ?: ""
+                val factory = remember(groupId, journalId) {
+                    TransactionDetailViewModelFactory(transactionRepository, groupId, journalId)
+                }
+                val viewModel: TransactionDetailViewModel = viewModel(key = "$groupId/$journalId", factory = factory)
+                TransactionDetailScreen(navController, viewModel)
             }
 
             composable(Screen.CreateAccount.route) {

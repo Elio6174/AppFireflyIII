@@ -67,3 +67,24 @@ data class TransactionSplitRequest(
     @SerializedName("foreign_amount") val foreignAmount: String? = null,
     @SerializedName("foreign_currency_code") val foreignCurrencyCode: String? = null
 )
+
+data class TransactionUpdateRequest(
+    @SerializedName("apply_rules") val applyRules: Boolean = true,
+    @SerializedName("fire_webhooks") val fireWebhooks: Boolean = true,
+    val transactions: List<TransactionSplitUpdateRequest>
+)
+
+data class TransactionSplitUpdateRequest(
+    @SerializedName("transaction_journal_id") val journalId: String,
+    val type: String,
+    val date: String,
+    val amount: String,
+    val description: String,
+    @SerializedName("source_id") val sourceId: String? = null,
+    @SerializedName("source_name") val sourceName: String? = null,
+    @SerializedName("destination_id") val destinationId: String? = null,
+    @SerializedName("destination_name") val destinationName: String? = null,
+    @SerializedName("category_name") val categoryName: String? = null,
+    @SerializedName("budget_name") val budgetName: String? = null,
+    val notes: String? = null
+)
