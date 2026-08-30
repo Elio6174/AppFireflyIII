@@ -7,7 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.model.TransactionGroup
@@ -16,9 +16,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.ui.draw.clip
+import com.example.appfireflyiii.ui.theme.AssetColor
+import com.example.appfireflyiii.ui.theme.RedExpense
+import com.example.appfireflyiii.util.formatAmount
+import com.example.appfireflyiii.util.formatRelativeDate
 
 @Composable
 fun TransactionsScreen(
@@ -27,32 +34,66 @@ fun TransactionsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        when (val state = uiState) {
-            is TransactionsUiState.Loading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Encabezado con botón de volver y título, igual al resto de las pantallas
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = "Volver")
             }
-            is TransactionsUiState.Error -> {
-                Column(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("No se pudo cargar: ${state.message}")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { viewModel.loadTransactions() }) {
-                        Text("Reintentar")
+            Text(
+                "Movimientos",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (val state = uiState) {
+                is TransactionsUiState.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+                is TransactionsUiState.Error -> {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("No se pudo cargar: ${state.message}")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = { viewModel.loadTransactions() }) {
+                            Text("Reintentar")
+                        }
                     }
                 }
-            }
-            is TransactionsUiState.Success -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp)
-                ) {
-                    items(state.transactions) { group ->
-                        group.attributes.transactions.forEach { split ->
-                            TransactionCard(split)
-                            Spacer(modifier = Modifier.height(8.dp))
+                is TransactionsUiState.Success -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        MonthSelector(
+                            monthLabel = state.monthLabel,
+                            canGoForward = state.canGoForward,
+                            onPrevious = { viewModel.previousMonth() },
+                            onNext = { viewModel.nextMonth() }
+                        )
+
+                        if (state.transactions.isEmpty()) {
+                            Text(
+                                "Sin movimientos este mes.",
+                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(24.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 100.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(state.transactions) { group ->
+                                    group.attributes.transactions.forEach { split ->
+                                        TransactionCard(split)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -62,50 +103,82 @@ fun TransactionsScreen(
 }
 
 @Composable
+fun MonthSelector(
+    monthLabel: String,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.Filled.ChevronLeft, contentDescription = "Mes anterior")
+        }
+        Text(
+            monthLabel,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        IconButton(onClick = onNext, enabled = canGoForward) {
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = "Mes siguiente",
+                tint = if (canGoForward) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+            )
+        }
+    }
+}
+
+@Composable
 fun TransactionCard(transaction: TransactionSplit) {
     val isExpense = transaction.type == "withdrawal"
-    val amountColor = if (isExpense) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
+    val amountColor = if (isExpense) RedExpense else AssetColor
     val amountPrefix = if (isExpense) "-" else "+"
-    val avatarColor = if (isExpense)
-        MaterialTheme.colorScheme.errorContainer
-    else
-        Color(0xFFD5EFD8)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(avatarColor),
+                    .background(amountColor.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isExpense) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
                     contentDescription = null,
-                    tint = if (isExpense) MaterialTheme.colorScheme.error else Color(0xFF2E7D32),
+                    tint = amountColor,
                     modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(transaction.description, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "${transaction.categoryName ?: "Sin categoría"} · ${transaction.date.take(10)}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    transaction.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "${transaction.categoryName ?: "Sin categoría"} · ${formatRelativeDate(transaction.date)}",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                "$amountPrefix${transaction.currencySymbol ?: ""}${transaction.amount}",
-                style = MaterialTheme.typography.titleMedium,
+                "$amountPrefix${formatAmount(transaction.amount, transaction.currencySymbol)}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
                 color = amountColor
             )
         }
