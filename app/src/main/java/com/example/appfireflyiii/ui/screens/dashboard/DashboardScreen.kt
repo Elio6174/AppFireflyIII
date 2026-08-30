@@ -1,10 +1,14 @@
 package com.example.appfireflyiii.ui.screens.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,19 +56,32 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
         Text("Resumen", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Card grande de balance total
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(20.dp)) {
+        // Card grande de balance total, con gradiente
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
+                        )
+                    )
+                )
+                .padding(20.dp)
+        ) {
+            Column {
                 Text(
                     "Balance total",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     "${data.currencySymbol}${data.totalBalance.setScale(2)}",
                     style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
@@ -73,7 +90,11 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
 
         // Dos cards lado a lado: ingreso y gasto del mes
         Row(modifier = Modifier.fillMaxWidth()) {
-            Card(modifier = Modifier.weight(1f)) {
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "Ingresos (mes)",
@@ -90,7 +111,11 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
                 }
             }
             Spacer(modifier = Modifier.width(12.dp))
-            Card(modifier = Modifier.weight(1f)) {
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "Gastos (mes)",
@@ -101,7 +126,7 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
                     Text(
                         "-${data.currencySymbol}${data.monthlyExpense.setScale(2)}",
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color(0xFFD32F2F),
+                        color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -115,14 +140,16 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
 
         OutlinedButton(
             onClick = { navController.navigate(Screen.Transactions.route) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Text("Ver todas las transacciones")
         }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedButton(
             onClick = { navController.navigate(Screen.Accounts.route) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Text("Ver cuentas")
         }

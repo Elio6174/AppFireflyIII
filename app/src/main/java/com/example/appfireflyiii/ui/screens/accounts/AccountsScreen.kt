@@ -11,6 +11,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.model.AccountData
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.ui.draw.clip
 
 @Composable
 fun AccountsScreen(
@@ -54,18 +63,44 @@ fun AccountsScreen(
 @Composable
 fun AccountCard(account: AccountData) {
     val attrs = account.attributes
-    Card(modifier = Modifier.fillMaxWidth()) {
+    val icon = when (attrs.type) {
+        "cash" -> Icons.Filled.Payments
+        "liabilities" -> Icons.Filled.CreditCard
+        else -> when (attrs.accountRole) {
+            "cashWalletAsset" -> Icons.Filled.AccountBalanceWallet
+            else -> Icons.Filled.AccountBalance
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(attrs.name, style = MaterialTheme.typography.titleMedium)
                 Text(
                     attrs.type,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

@@ -37,12 +37,13 @@ import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewMod
 import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModel
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModelFactory
+import com.example.appfireflyiii.ui.theme.AppFireflyTheme
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            AppFireflyTheme {
                 FireflyApp(activity = this)
             }
         }

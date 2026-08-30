@@ -12,6 +12,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.model.TransactionGroup
 import com.example.appfireflyiii.data.model.TransactionSplit
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.ui.draw.clip
 
 @Composable
 fun TransactionsScreen(
@@ -57,27 +64,42 @@ fun TransactionsScreen(
 @Composable
 fun TransactionCard(transaction: TransactionSplit) {
     val isExpense = transaction.type == "withdrawal"
-    val amountColor = if (isExpense) Color(0xFFD32F2F) else Color(0xFF2E7D32)
+    val amountColor = if (isExpense) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
     val amountPrefix = if (isExpense) "-" else "+"
+    val avatarColor = if (isExpense)
+        MaterialTheme.colorScheme.errorContainer
+    else
+        Color(0xFFD5EFD8)
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(avatarColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isExpense) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+                    contentDescription = null,
+                    tint = if (isExpense) MaterialTheme.colorScheme.error else Color(0xFF2E7D32),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(transaction.description, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    transaction.categoryName ?: "Sin categoría",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    transaction.date.take(10), // solo la fecha, sin hora
-                    style = MaterialTheme.typography.bodySmall,
+                    "${transaction.categoryName ?: "Sin categoría"} · ${transaction.date.take(10)}",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
