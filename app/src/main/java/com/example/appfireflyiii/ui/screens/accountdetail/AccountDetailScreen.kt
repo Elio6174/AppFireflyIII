@@ -27,6 +27,17 @@ import com.example.appfireflyiii.ui.theme.CardGradientStart
 import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.formatAmount
 import com.example.appfireflyiii.util.verticalScrollColumn
+import com.example.appfireflyiii.util.formatRelativeDate
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material.icons.filled.ArrowForward
+import com.example.appfireflyiii.navigation.Screen
+import com.example.appfireflyiii.util.currentMonthLabel
 
 @Composable
 fun AccountDetailScreen(
@@ -64,7 +75,7 @@ fun AccountDetailScreen(
                     }
                 }
                 is AccountDetailUiState.Success -> {
-                    AccountDetailContent(state.data)
+                    AccountDetailContent(state.data, navController)
                 }
             }
         }
@@ -72,7 +83,7 @@ fun AccountDetailScreen(
 }
 
 @Composable
-fun AccountDetailContent(data: AccountDetailData) {
+fun AccountDetailContent(data: AccountDetailData, navController: NavController) {
     val attrs = data.account.attributes
     val balance = attrs.currentBalance.toDoubleOrNull() ?: 0.0
 
@@ -107,7 +118,18 @@ fun AccountDetailContent(data: AccountDetailData) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("Evolución del mes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Evolución del mes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                currentMonthLabel(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             "Aproximado, reconstruido a partir de los movimientos del mes",
@@ -116,11 +138,26 @@ fun AccountDetailContent(data: AccountDetailData) {
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        BalanceLineChart(data.dailyBalance)
+        BalanceLineChart(data.dailyBalance, attrs.currencySymbol)
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        Text("Movimientos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Movimientos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
+                Text("Ver todos")
+                Spacer(modifier = Modifier.width(2.dp))
+                Icon(
+                    Icons.Filled.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(12.dp))
 
         if (data.transactions.isEmpty()) {
@@ -135,41 +172,114 @@ fun AccountDetailContent(data: AccountDetailData) {
                     AccountTransactionRow(split)
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
         }
+
+        Spacer(modifier = Modifier.height(100.dp)) // deja espacio para que la bottom nav no tape el último item
     }
 }
 
 @Composable
-fun BalanceLineChart(values: List<Float>) {
+fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
+    if (values.size < 2) return
+
     val lineColor = MaterialTheme.colorScheme.primary
+    val density = LocalDensity.current
 
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp)
-    ) {
-        if (values.size < 2) return@Canvas
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    var canvasSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
 
-        val minValue = values.min()
-        val maxValue = values.max()
-        val range = (maxValue - minValue).takeIf { it != 0f } ?: 1f
+    val minValue = values.min()
+    val maxValue = values.max()
+    val range = (maxValue - minValue).takeIf { it != 0f } ?: 1f
 
-        val stepX = size.width / (values.size - 1)
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .pointerInput(values) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            selectedIndex = nearestIndex(offset.x, canvasSize.width, values.size)
+                        },
+                        onDrag = { change, _ ->
+                            selectedIndex = nearestIndex(change.position.x, canvasSize.width, values.size)
+                        },
+                        onDragEnd = { selectedIndex = null }
+                    )
+                }
+                .pointerInput(values) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            selectedIndex = nearestIndex(offset.x, canvasSize.width, values.size)
+                            tryAwaitRelease()
+                            selectedIndex = null
+                        }
+                    )
+                }
+        ) {
+            canvasSize = size
+            val stepX = size.width / (values.size - 1)
 
-        val path = androidx.compose.ui.graphics.Path()
-        values.forEachIndexed { index, value ->
-            val x = index * stepX
-            val y = size.height - ((value - minValue) / range) * size.height
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            val path = androidx.compose.ui.graphics.Path()
+            values.forEachIndexed { index, value ->
+                val x = index * stepX
+                val y = size.height - ((value - minValue) / range) * size.height
+                if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path = path, color = lineColor, style = Stroke(width = 4f))
+
+            selectedIndex?.let { idx ->
+                val x = idx * stepX
+                val y = size.height - ((values[idx] - minValue) / range) * size.height
+
+                drawLine(
+                    color = lineColor.copy(alpha = 0.4f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, size.height),
+                    strokeWidth = 2f
+                )
+                drawCircle(color = lineColor, radius = 8f, center = Offset(x, y))
+                drawCircle(color = Color.White, radius = 3f, center = Offset(x, y))
+            }
         }
 
-        drawPath(
-            path = path,
-            color = lineColor,
-            style = Stroke(width = 4f)
-        )
+        selectedIndex?.let { idx ->
+            val stepX = if (canvasSize.width > 0) canvasSize.width / (values.size - 1) else 0f
+            val xPx = idx * stepX
+            val xDp = with(density) { xPx.toDp() }
+            val tooltipOffsetX = (xDp - 55.dp).coerceAtLeast(0.dp)
+
+            Box(
+                modifier = Modifier
+                    .offset(x = tooltipOffsetX, y = 4.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.inverseSurface)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Column {
+                    Text(
+                        "Día ${idx + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        formatAmount(values[idx].toDouble(), currencySymbol),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.inverseOnSurface
+                    )
+                }
+            }
+        }
     }
+}
+
+private fun nearestIndex(touchX: Float, canvasWidth: Float, count: Int): Int {
+    if (canvasWidth <= 0f || count < 2) return 0
+    val stepX = canvasWidth / (count - 1)
+    val index = (touchX / stepX).toInt()
+    return index.coerceIn(0, count - 1)
 }
 
 @Composable
@@ -206,7 +316,7 @@ fun AccountTransactionRow(split: TransactionSplit) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "${split.categoryName ?: "Sin categoría"} · ${split.date.take(10)}",
+                    "${split.categoryName ?: "Sin categoría"} · ${formatRelativeDate(split.date)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

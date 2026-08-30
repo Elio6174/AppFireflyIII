@@ -82,20 +82,18 @@ class AccountDetailViewModel(
                         }
                     }
 
-                    // Reconstruye el balance de cada día partiendo del balance actual hacia atrás
-                    val totalNet = dailyNet.sum()
-                    var runningFromEnd = totalNet
                     val dailyBalance = DoubleArray(daysInMonth)
+                    var suffixSum = 0.0
                     for (day in daysInMonth downTo 1) {
-                        dailyBalance[day - 1] = currentBalance - runningFromEnd + dailyNet[day - 1]
-                        runningFromEnd -= dailyNet[day - 1]
+                        dailyBalance[day - 1] = currentBalance - suffixSum
+                        suffixSum += dailyNet[day - 1]
                     }
 
                     _uiState.value = AccountDetailUiState.Success(
                         AccountDetailData(
                             account = account,
                             dailyBalance = dailyBalance.map { it.toFloat() },
-                            transactions = allSplits.sortedByDescending { it.date }.take(15)
+                            transactions = allSplits.sortedByDescending { it.date }.take(5)
                         )
                     )
                 }
