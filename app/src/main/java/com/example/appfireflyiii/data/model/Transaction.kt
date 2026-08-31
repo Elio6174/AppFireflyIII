@@ -37,7 +37,8 @@ data class TransactionSplit(
     @SerializedName("category_name") val categoryName: String?,
     @SerializedName("budget_id") val budgetId: String?,
     @SerializedName("budget_name") val budgetName: String?,
-    val notes: String?
+    val notes: String?,
+    val groupId: String? = null
 )
 
 data class TransactionStoreResponse(

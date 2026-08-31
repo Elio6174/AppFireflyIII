@@ -130,8 +130,17 @@ fun FireflyApp(activity: FragmentActivity) {
                 val viewModel: AccountsViewModel = viewModel(factory = accountsViewModelFactory)
                 AccountsScreen(navController, viewModel)
             }
-            composable(Screen.Transactions.route) {
-                val viewModel: TransactionsViewModel = viewModel(factory = transactionsViewModelFactory)
+            composable(
+                route = Screen.Transactions.route,
+                arguments = listOf(navArgument("filter") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                })
+            ) { backStackEntry ->
+                val filter = backStackEntry.arguments?.getString("filter")
+                val factory = remember(filter) { TransactionsViewModelFactory(transactionRepository, filter) }
+                val viewModel: TransactionsViewModel = viewModel(key = filter ?: "all", factory = factory)
                 TransactionsScreen(navController, viewModel)
             }
             composable(Screen.NewTransaction.route) {

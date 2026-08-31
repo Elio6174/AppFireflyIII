@@ -1,6 +1,7 @@
 package com.example.appfireflyiii.ui.screens.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,7 @@ import com.example.appfireflyiii.ui.theme.CardGradientStart
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,14 +126,26 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
                             "↑ ${formatAmount(data.monthlyIncome.toDouble(), data.currencySymbol)}",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = AssetColor
+                            color = AssetColor,
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                navController.navigate(Screen.Transactions.createRoute("deposit"))
+                            }
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
                             "↓ ${formatAmount(data.monthlyExpense.toDouble(), data.currencySymbol)}",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = RedExpense
+                            color = RedExpense,
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                navController.navigate(Screen.Transactions.createRoute("withdrawal"))
+                            }
                         )
                     }
                 }
@@ -156,7 +170,7 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
                 QuickAction(
                     label = "Movimientos",
                     icon = Icons.Filled.Receipt,
-                    onClick = { navController.navigate(Screen.Transactions.route) }
+                    onClick = { navController.navigate(Screen.Transactions.createRoute()) }
                 )
                 QuickAction(
                     label = "Reportes",
@@ -174,7 +188,7 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Movimientos recientes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
+                TextButton(onClick = { navController.navigate(Screen.Transactions.createRoute()) }) {
                     Text("Ver todo")
                 }
             }
@@ -194,7 +208,11 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 data.recentTransactions.forEach { split ->
-                    RecentTransactionRow(split)
+                    RecentTransactionRow(split) {
+                        val groupId = split.groupId ?: return@RecentTransactionRow
+                        val journalId = split.journalId ?: return@RecentTransactionRow
+                        navController.navigate(Screen.TransactionDetail.createRoute(groupId, journalId))
+                    }
                 }
             }
         }
@@ -225,14 +243,20 @@ fun QuickAction(label: String, icon: ImageVector, onClick: () -> Unit) {
 }
 
 @Composable
-fun RecentTransactionRow(split: TransactionSplit) {
+fun RecentTransactionRow(split: TransactionSplit, onClick: () -> Unit = {}) {
     val isExpense = split.type == "withdrawal"
     val amountColor = if (isExpense) RedExpense else AssetColor
     val prefix = if (isExpense) "-" else "+"
     val amountValue = split.amount.toDoubleOrNull() ?: 0.0
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)

@@ -86,7 +86,7 @@ class DashboardViewModel(
             }
 
             val recentSplits = recentResult.getOrNull()
-                ?.flatMap { it.attributes.transactions }
+                ?.flatMap { group -> group.attributes.transactions.map { it.copy(groupId = group.id) } }
                 ?.sortedByDescending { it.date }
                 ?.take(5)
                 ?: emptyList()

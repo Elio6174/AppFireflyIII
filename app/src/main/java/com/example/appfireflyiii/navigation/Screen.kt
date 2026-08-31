@@ -14,7 +14,10 @@ sealed class Screen(
     data object NewTransaction : Screen("new_transaction", "Nueva", Icons.Filled.Add)
     data object Reports : Screen("reports", "Reportes", Icons.Filled.BarChart)
     data object More : Screen("more", "Más", Icons.Filled.Menu)
-    data object Transactions : Screen("transactions", "Transacciones")
+    data object Transactions : Screen("transactions?filter={filter}", "Transacciones") {
+        fun createRoute(filter: String? = null) =
+            if (filter != null) "transactions?filter=$filter" else "transactions"
+    }
 
     data object TokenSetup : Screen("token_setup", "Configurar")
     data object Login : Screen("login", "Ingresar")

@@ -22,7 +22,10 @@ sealed class TransactionsUiState {
     data class Error(val message: String) : TransactionsUiState()
 }
 
-class TransactionsViewModel(private val repository: TransactionRepository) : ViewModel() {
+class TransactionsViewModel(
+    private val repository: TransactionRepository,
+    val filterType: String? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<TransactionsUiState>(TransactionsUiState.Loading)
     val uiState: StateFlow<TransactionsUiState> = _uiState
@@ -46,7 +49,8 @@ class TransactionsViewModel(private val repository: TransactionRepository) : Vie
                             group.copy(
                                 attributes = group.attributes.copy(
                                     transactions = group.attributes.transactions.filter {
-                                        it.type != "opening balance"
+                                        it.type != "opening balance" &&
+                                                (filterType == null || it.type == filterType)
                                     }
                                 )
                             )
@@ -99,10 +103,11 @@ class TransactionsViewModel(private val repository: TransactionRepository) : Vie
 }
 
 class TransactionsViewModelFactory(
-    private val repository: TransactionRepository
+    private val repository: TransactionRepository,
+    private val filterType: String? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         @Suppress("UNCHECKED_CAST")
-        return TransactionsViewModel(repository) as T
+        return TransactionsViewModel(repository, filterType) as T
     }
 }
