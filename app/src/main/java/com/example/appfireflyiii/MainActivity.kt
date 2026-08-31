@@ -56,6 +56,13 @@ import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailS
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModel
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModelFactory
 import androidx.compose.ui.Modifier
+import com.example.appfireflyiii.ui.components.MainTabsScreen
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import com.example.appfireflyiii.navigation.bottomNavItems
+import com.example.appfireflyiii.ui.components.MainTabsScreen
 
 
 class MainActivity : FragmentActivity() {
@@ -73,6 +80,7 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun FireflyApp(activity: FragmentActivity) {
     val navController = rememberNavController()
@@ -91,22 +99,23 @@ fun FireflyApp(activity: FragmentActivity) {
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
 
+    // El pager ahora vive aquí arriba, compartido entre MainTabsScreen y los trampolines.
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        pageCount = { bottomNavItems.size }
+    )
+    val scope = rememberCoroutineScope()
+
     val startDestination = when {
         !hasToken -> Screen.TokenSetup.route
         !isAuthenticated -> Screen.Login.route
-        else -> Screen.Dashboard.route
+        else -> Screen.MainTabs.route
     }
 
-    Scaffold(
-        bottomBar = {
-            if (isAuthenticated) FireflyBottomNavBar(navController)
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(innerPadding)
-        ) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        NavHost(navController = navController, startDestination = startDestination) {
             composable(Screen.TokenSetup.route) {
                 TokenSetupScreen(tokenStorage) {
                     navController.navigate(Screen.Login.route) {
@@ -117,41 +126,63 @@ fun FireflyApp(activity: FragmentActivity) {
             composable(Screen.Login.route) {
                 LoginScreen(biometricAuthManager) {
                     isAuthenticated = true
-                    navController.navigate(Screen.Dashboard.route) {
+                    navController.navigate(Screen.MainTabs.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
             }
-            composable(Screen.Dashboard.route) {
-                val viewModel: DashboardViewModel = viewModel(factory = dashboardViewModelFactory)
-                DashboardScreen(navController, viewModel)
+
+            composable(Screen.MainTabs.route) {
+                MainTabsScreen(
+                    navController = navController,
+                    pagerState = pagerState,
+                    dashboardViewModelFactory = dashboardViewModelFactory,
+                    accountsViewModelFactory = accountsViewModelFactory,
+                    newTransactionViewModelFactory = newTransactionViewModelFactory,
+                    reportsViewModelFactory = reportsViewModelFactory,
+                    accountRepository = accountRepository,
+                    budgetRepository = budgetRepository
+                )
             }
-            composable(Screen.Accounts.route) {
-                val viewModel: AccountsViewModel = viewModel(factory = accountsViewModelFactory)
-                AccountsScreen(navController, viewModel)
-            }
+
+            listOf(Screen.Dashboard, Screen.Accounts, Screen.NewTransaction, Screen.Reports, Screen.More)
+                .forEach { tabScreen ->
+                    composable(tabScreen.route) {
+                        LaunchedEffect(Unit) {
+                            val index = bottomNavItems.indexOf(tabScreen)
+                            if (index >= 0) pagerState.animateScrollToPage(index)
+                            navController.popBackStack()
+                        }
+                    }
+                }
+
             composable(
                 route = Screen.Transactions.route,
-                arguments = listOf(navArgument("filter") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                })
+                arguments = listOf(
+                    navArgument("filter") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("accountId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
             ) { backStackEntry ->
                 val filter = backStackEntry.arguments?.getString("filter")
-                val factory = remember(filter) { TransactionsViewModelFactory(transactionRepository, filter) }
-                val viewModel: TransactionsViewModel = viewModel(key = filter ?: "all", factory = factory)
+                val accountId = backStackEntry.arguments?.getString("accountId")
+                val factory = remember(filter, accountId) {
+                    TransactionsViewModelFactory(transactionRepository, filter, accountRepository, accountId)
+                }
+                val viewModel: TransactionsViewModel = viewModel(
+                    key = "${filter ?: "all"}_${accountId ?: "all"}",
+                    factory = factory
+                )
                 TransactionsScreen(navController, viewModel)
             }
-            composable(Screen.NewTransaction.route) {
-                val viewModel: NewTransactionViewModel = viewModel(factory = newTransactionViewModelFactory)
-                NewTransactionScreen(navController, viewModel, accountRepository, budgetRepository)
-            }
-            composable(Screen.Reports.route) {
-                val viewModel: ReportsViewModel = viewModel(factory = reportsViewModelFactory)
-                ReportsScreen(navController, viewModel)
-            }
-            composable(Screen.More.route) { MoreScreen(navController) }
+
             composable(
                 route = Screen.AccountDetail.route,
                 arguments = listOf(navArgument("accountId") { type = NavType.StringType })
@@ -168,7 +199,6 @@ fun FireflyApp(activity: FragmentActivity) {
                 val viewModel: EditAccountViewModel = viewModel(key = accountId, factory = factory)
                 EditAccountScreen(navController, viewModel)
             }
-
             composable(
                 route = Screen.TransactionDetail.route,
                 arguments = listOf(
@@ -184,7 +214,6 @@ fun FireflyApp(activity: FragmentActivity) {
                 val viewModel: TransactionDetailViewModel = viewModel(key = "$groupId/$journalId", factory = factory)
                 TransactionDetailScreen(navController, viewModel, accountRepository, budgetRepository)
             }
-
             composable(Screen.CreateAccount.route) {
                 val factory = remember { CreateAccountViewModelFactory(accountRepository) }
                 val viewModel: CreateAccountViewModel = viewModel(factory = factory)

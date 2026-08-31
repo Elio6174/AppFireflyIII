@@ -13,10 +13,15 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+data class AccountTransactionItem(
+    val groupId: String,
+    val split: TransactionSplit
+)
+
 data class AccountDetailData(
     val account: AccountData,
-    val dailyBalance: List<Float>, // balance reconstruido, un valor por día del mes
-    val transactions: List<TransactionSplit>
+    val dailyBalance: List<Float>,
+    val transactions: List<AccountTransactionItem>
 )
 
 sealed class AccountDetailUiState {
@@ -61,13 +66,12 @@ class AccountDetailViewModel(
                 .onSuccess { groups ->
                     val currentBalance = account.attributes.currentBalance.toDoubleOrNull() ?: 0.0
 
-                    // Movimiento neto por día (positivo si aumentó el saldo de esta cuenta, negativo si bajó)
                     val dailyNet = DoubleArray(daysInMonth)
-                    val allSplits = mutableListOf<TransactionSplit>()
+                    val allItems = mutableListOf<AccountTransactionItem>()
 
                     groups.forEach { group ->
                         group.attributes.transactions.forEach { split ->
-                            allSplits.add(split)
+                            allItems.add(AccountTransactionItem(groupId = group.id, split = split))
                             val amount = split.amount.toDoubleOrNull() ?: 0.0
                             val day = split.date.take(10).takeLast(2).toIntOrNull()
                             if (day == null || day !in 1..daysInMonth) return@forEach
@@ -93,7 +97,7 @@ class AccountDetailViewModel(
                         AccountDetailData(
                             account = account,
                             dailyBalance = dailyBalance.map { it.toFloat() },
-                            transactions = allSplits.sortedByDescending { it.date }.take(5)
+                            transactions = allItems.sortedByDescending { it.split.date }.take(5)
                         )
                     )
                 }

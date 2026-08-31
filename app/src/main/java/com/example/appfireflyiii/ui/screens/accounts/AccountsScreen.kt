@@ -44,6 +44,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private data class AccountsComputed(
+    val assets: List<AccountData>,
+    val liabilities: List<AccountData>,
+    val others: List<AccountData>,
+    val assetsTotal: Double,
+    val liabilitiesTotal: Double
+)
+
 @Composable
 fun AccountsScreen(
     navController: NavController,
@@ -69,20 +77,21 @@ fun AccountsScreen(
                 }
             }
             is AccountsUiState.Success -> {
-                val visibleAccounts = state.accounts.filterNot { it.attributes.type == "cash" }
-                val assets = visibleAccounts.filter { it.attributes.type == "asset" }
-                val liabilities = visibleAccounts.filter {
-                    it.attributes.type == "liabilities" || it.attributes.type == "liability"
-                }
-                val others = visibleAccounts.filterNot { account ->
-                    account.attributes.type in listOf("asset", "liabilities", "liability")
-                }
+                val computed = remember(state.accounts) {
+                    val visibleAccounts = state.accounts.filterNot { it.attributes.type == "cash" }
+                    val assets = visibleAccounts.filter { it.attributes.type == "asset" }
+                    val liabilities = visibleAccounts.filter {
+                        it.attributes.type == "liabilities" || it.attributes.type == "liability"
+                    }
+                    val others = visibleAccounts.filterNot { account ->
+                        account.attributes.type in listOf("asset", "liabilities", "liability")
+                    }
+                    val assetsTotal = assets.sumOf { it.attributes.currentBalance.toDoubleOrNull() ?: 0.0 }
+                    val liabilitiesTotal = liabilities.sumOf { it.attributes.currentBalance.toDoubleOrNull() ?: 0.0 }
 
-                val assetsTotal = assets.sumOf { it.attributes.currentBalance.toDoubleOrNull() ?: 0.0 }
-                val liabilitiesTotal = liabilities.sumOf { it.attributes.currentBalance.toDoubleOrNull() ?: 0.0 }
-                val netWorth = assetsTotal + liabilitiesTotal
-                val symbol = assets.firstOrNull()?.attributes?.currencySymbol
-                    ?: liabilities.firstOrNull()?.attributes?.currencySymbol
+                    AccountsComputed(assets, liabilities, others, assetsTotal, liabilitiesTotal)
+                }
+                val (assets, liabilities, others, assetsTotal, liabilitiesTotal) = computed
 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),

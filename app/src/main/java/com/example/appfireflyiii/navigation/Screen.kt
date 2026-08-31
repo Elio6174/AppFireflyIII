@@ -14,9 +14,13 @@ sealed class Screen(
     data object NewTransaction : Screen("new_transaction", "Nueva", Icons.Filled.Add)
     data object Reports : Screen("reports", "Reportes", Icons.Filled.BarChart)
     data object More : Screen("more", "Más", Icons.Filled.Menu)
-    data object Transactions : Screen("transactions?filter={filter}", "Transacciones") {
-        fun createRoute(filter: String? = null) =
-            if (filter != null) "transactions?filter=$filter" else "transactions"
+    data object Transactions : Screen("transactions?filter={filter}&accountId={accountId}", "Transacciones") {
+        fun createRoute(filter: String? = null, accountId: String? = null): String {
+            val params = mutableListOf<String>()
+            if (filter != null) params.add("filter=$filter")
+            if (accountId != null) params.add("accountId=$accountId")
+            return if (params.isEmpty()) "transactions" else "transactions?" + params.joinToString("&")
+        }
     }
 
     data object TokenSetup : Screen("token_setup", "Configurar")
@@ -34,8 +38,8 @@ sealed class Screen(
     data object EditAccount : Screen("edit_account/{accountId}", "Editar cuenta") {
         fun createRoute(accountId: String) = "edit_account/$accountId"
     }
-
     data object CreateAccount : Screen("create_account", "Nueva cuenta")
+    data object MainTabs : Screen("main_tabs", "Inicio")
 }
 val bottomNavItems = listOf(
     Screen.Dashboard,

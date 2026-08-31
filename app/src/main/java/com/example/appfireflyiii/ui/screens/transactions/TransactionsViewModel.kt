@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.appfireflyiii.data.model.TransactionGroup
+import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,9 @@ sealed class TransactionsUiState {
 
 class TransactionsViewModel(
     private val repository: TransactionRepository,
-    val filterType: String? = null
+    val filterType: String? = null,
+    private val accountRepository: AccountRepository? = null,
+    private val accountId: String? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<TransactionsUiState>(TransactionsUiState.Loading)
@@ -42,7 +45,13 @@ class TransactionsViewModel(
 
             val (start, end, label) = monthRange(monthOffset)
 
-            repository.getTransactionsByRange(start, end)
+            val result = if (accountId != null && accountRepository != null) {
+                accountRepository.getAccountTransactions(accountId, start, end)
+            } else {
+                repository.getTransactionsByRange(start, end)
+            }
+
+            result
                 .onSuccess { groups ->
                     val filtered = groups
                         .map { group ->
@@ -104,10 +113,12 @@ class TransactionsViewModel(
 
 class TransactionsViewModelFactory(
     private val repository: TransactionRepository,
-    private val filterType: String? = null
+    private val filterType: String? = null,
+    private val accountRepository: AccountRepository? = null,
+    private val accountId: String? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         @Suppress("UNCHECKED_CAST")
-        return TransactionsViewModel(repository, filterType) as T
+        return TransactionsViewModel(repository, filterType, accountRepository, accountId) as T
     }
 }

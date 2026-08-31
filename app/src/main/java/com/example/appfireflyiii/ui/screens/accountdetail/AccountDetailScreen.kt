@@ -41,6 +41,8 @@ import com.example.appfireflyiii.util.formatAmount
 import com.example.appfireflyiii.util.formatRelativeDate
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.composed
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -192,7 +194,9 @@ fun AccountDetailPageContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Movimientos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
+                    TextButton(onClick = {
+                        navController.navigate(Screen.Transactions.createRoute(accountId = account.id))
+                    }) {
                         Text("Ver todos")
                         Spacer(modifier = Modifier.width(2.dp))
                         Icon(Icons.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -208,15 +212,23 @@ fun AccountDetailPageContent(
                     )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        state.data.transactions.forEach { split ->
-                            AccountTransactionRow(split)
+                        state.data.transactions.forEach { item ->
+                            AccountTransactionRow(
+                                split = item.split,
+                                onClick = {
+                                    val journalId = item.split.journalId ?: return@AccountTransactionRow
+                                    navController.navigate(
+                                        Screen.TransactionDetail.createRoute(item.groupId, journalId)
+                                    )
+                                }
+                            )
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(100.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -326,7 +338,7 @@ private fun nearestIndex(touchX: Float, canvasWidth: Float, count: Int): Int {
 }
 
 @Composable
-fun AccountTransactionRow(split: TransactionSplit) {
+fun AccountTransactionRow(split: TransactionSplit, onClick: () -> Unit = {}) {
     val amountColor = when (split.type) {
         "withdrawal" -> RedExpense
         "deposit" -> AssetColor
@@ -340,7 +352,13 @@ fun AccountTransactionRow(split: TransactionSplit) {
     val amountValue = split.amount.toDoubleOrNull() ?: 0.0
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
