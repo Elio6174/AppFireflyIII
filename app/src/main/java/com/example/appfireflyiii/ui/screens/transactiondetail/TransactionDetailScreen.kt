@@ -1,15 +1,24 @@
 package com.example.appfireflyiii.ui.screens.transactiondetail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -168,6 +177,11 @@ private fun TransactionDetailContent(
     val isExpense = split.type == "withdrawal"
     val amountColor = if (isExpense) RedExpense else AssetColor
     val amountPrefix = if (isExpense) "-" else "+"
+    val typeIcon = when (split.type) {
+        "withdrawal" -> Icons.Filled.ArrowUpward
+        "deposit" -> Icons.Filled.ArrowDownward
+        else -> Icons.Filled.SwapHoriz
+    }
 
     Column(
         modifier = Modifier
@@ -179,12 +193,12 @@ private fun TransactionDetailContent(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                modifier = Modifier.fillMaxWidth().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -197,14 +211,15 @@ private fun TransactionDetailContent(
                 Text(
                     split.description,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        FormSection(title = "Información") {
+        FormSection(title = "Información", icon = Icons.Filled.Info) {
             DetailRow(label = "Tipo", value = transactionTypeLabel(split.type))
             DetailRow(label = "Fecha", value = split.date.take(10))
             DetailRow(label = "Categoría", value = split.categoryName ?: "Sin categoría")
@@ -215,7 +230,7 @@ private fun TransactionDetailContent(
 
         if (!split.sourceName.isNullOrBlank() || !split.destinationName.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(16.dp))
-            FormSection(title = "Cuentas") {
+            FormSection(title = "Cuentas", icon = Icons.Filled.AccountBalanceWallet) {
                 if (!split.sourceName.isNullOrBlank()) {
                     DetailRow(label = "Origen", value = split.sourceName)
                 }
@@ -227,11 +242,11 @@ private fun TransactionDetailContent(
 
         if (!split.notes.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(16.dp))
-            FormSection(title = "Notas") {
+            FormSection(title = "Notas", icon = Icons.Filled.Notes) {
                 Text(
                     split.notes,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color.White.copy(alpha = 0.85f)
                 )
             }
         }
@@ -244,18 +259,18 @@ private fun TransactionDetailContent(
         ) {
             OutlinedButton(
                 onClick = { showDeleteConfirm = true },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
             ) {
-                Text("Eliminar")
+                Text("Eliminar", fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = onEditClick,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp)
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Editar")
+                Text("Editar", fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -273,13 +288,14 @@ private fun TransactionDetailContent(
                     Text(
                         "¿Eliminar este movimiento?",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         "Esta acción no se puede deshacer. Se eliminará el movimiento de forma permanente.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color.White.copy(alpha = 0.75f)
                     )
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -313,21 +329,22 @@ private fun TransactionDetailContent(
 }
 
 @Composable
-private fun FormSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Spacer(modifier = Modifier.height(10.dp))
+private fun FormSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), content = content)
+        Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            content()
+        }
     }
 }
 
@@ -340,12 +357,13 @@ private fun DetailRow(label: String, value: String) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = Color.White.copy(alpha = 0.6f)
         )
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White
         )
     }
 }

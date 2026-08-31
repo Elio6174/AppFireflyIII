@@ -2,6 +2,7 @@ package com.example.appfireflyiii
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
@@ -54,6 +55,7 @@ import com.example.appfireflyiii.data.repository.BudgetRepository
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailScreen
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModel
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModelFactory
+import androidx.compose.ui.Modifier
 
 
 class MainActivity : FragmentActivity() {
@@ -100,7 +102,11 @@ fun FireflyApp(activity: FragmentActivity) {
             if (isAuthenticated) FireflyBottomNavBar(navController)
         }
     ) { innerPadding ->
-        NavHost(navController = navController, startDestination = startDestination) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.padding(innerPadding)
+        ) {
             composable(Screen.TokenSetup.route) {
                 TokenSetupScreen(tokenStorage) {
                     navController.navigate(Screen.Login.route) {

@@ -234,6 +234,11 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
     val maxValue = values.max()
     val range = (maxValue - minValue).takeIf { it != 0f } ?: 1f
 
+    val todayIndex = remember(values.size) {
+        val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+        (todayDay - 1).coerceIn(0, values.size - 1)
+    }
+
     Box(modifier = Modifier.fillMaxWidth()) {
         Canvas(
             modifier = Modifier
@@ -267,6 +272,15 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
             }
             drawPath(path = path, color = lineColor, style = Stroke(width = 4f))
 
+            val todayX = todayIndex * stepX
+            drawLine(
+                color = Color(0xFFEF4444),
+                start = Offset(todayX, 0f),
+                end = Offset(todayX, size.height),
+                strokeWidth = 3f,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f)
+            )
+
             selectedIndex?.let { idx ->
                 val x = idx * stepX
                 val y = size.height - ((values[idx] - minValue) / range) * size.height
@@ -275,6 +289,8 @@ fun BalanceLineChart(values: List<Float>, currencySymbol: String?) {
                 drawCircle(color = Color.White, radius = 3f, center = Offset(x, y))
             }
         }
+
+
 
         selectedIndex?.let { idx ->
             val stepX = if (canvasSize.width > 0) canvasSize.width / (values.size - 1) else 0f
