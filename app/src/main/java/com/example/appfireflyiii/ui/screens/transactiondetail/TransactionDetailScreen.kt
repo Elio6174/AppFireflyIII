@@ -3,34 +3,39 @@ package com.example.appfireflyiii.ui.screens.transactiondetail
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.model.TransactionSplit
+import com.example.appfireflyiii.data.repository.AccountRepository
+import com.example.appfireflyiii.data.repository.BudgetRepository
+import com.example.appfireflyiii.ui.screens.newtransaction.SaveState
+import com.example.appfireflyiii.ui.screens.newtransaction.TransactionFormBody
+import com.example.appfireflyiii.ui.screens.newtransaction.TransactionFormInitialValues
 import com.example.appfireflyiii.ui.theme.AssetColor
 import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.formatAmount
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun TransactionDetailScreen(
     navController: NavController,
-    viewModel: TransactionDetailViewModel
+    viewModel: TransactionDetailViewModel,
+    accountRepository: AccountRepository,
+    budgetRepository: BudgetRepository
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val saveState by viewModel.saveState.collectAsState()
     var isEditing by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -38,7 +43,9 @@ fun TransactionDetailScreen(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
+            IconButton(onClick = {
+                if (isEditing) isEditing = false else navController.popBackStack()
+            }) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Volver")
             }
             Text(
@@ -65,19 +72,44 @@ fun TransactionDetailScreen(
                         }
                     }
                 }
-                is TransactionDetailUiState.Saved, is TransactionDetailUiState.Deleted -> {
+                is TransactionDetailUiState.Deleted -> {
                     LaunchedEffect(Unit) {
                         navController.popBackStack()
                     }
                 }
                 is TransactionDetailUiState.Loaded -> {
                     if (isEditing) {
-                        TransactionEditForm(
-                            split = state.split,
-                            onCancel = { isEditing = false },
-                            onSave = { date, amount, description, category, budget, notes ->
-                                viewModel.save(date, amount, description, category, budget, notes)
-                            }
+                        TransactionFormBody(
+                            title = "Editar movimiento",
+                            submitLabel = "Guardar cambios",
+                            initialValues = initialValuesFrom(state.split),
+                            saveState = saveState,
+                            accountRepository = accountRepository,
+                            budgetRepository = budgetRepository,
+                            onSave = { type, date, amount, description, sourceId, destinationName, sourceName,
+                                       destinationId, categoryName, budgetName, notes, tags, foreignAmount,
+                                       foreignCurrencyCode, applyRules, fireWebhooks ->
+                                viewModel.save(
+                                    type = type,
+                                    date = date,
+                                    amount = amount,
+                                    description = description,
+                                    sourceId = sourceId,
+                                    destinationName = destinationName,
+                                    sourceName = sourceName,
+                                    destinationId = destinationId,
+                                    categoryName = categoryName,
+                                    budgetName = budgetName,
+                                    notes = notes,
+                                    tags = tags,
+                                    foreignAmount = foreignAmount,
+                                    foreignCurrencyCode = foreignCurrencyCode,
+                                    applyRules = applyRules,
+                                    fireWebhooks = fireWebhooks
+                                )
+                            },
+                            // al guardar bien, regresamos a la vista de solo lectura (no salimos de la pantalla)
+                            onSavedNavigateBack = { isEditing = false }
                         )
                     } else {
                         TransactionDetailContent(
@@ -87,12 +119,42 @@ fun TransactionDetailScreen(
                         )
                     }
                 }
-                is TransactionDetailUiState.Saving -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
             }
         }
     }
+}
+
+/** Convierte el split cargado en los valores iniciales que espera el formulario reciclado. */
+private fun initialValuesFrom(split: TransactionSplit): TransactionFormInitialValues {
+    var dateMillis: Long? = null
+    var hour: Int? = null
+    var minute: Int? = null
+    try {
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
+        val parsed = parser.parse(split.date)
+        if (parsed != null) {
+            dateMillis = parsed.time
+            val cal = java.util.Calendar.getInstance().apply { time = parsed }
+            hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            minute = cal.get(java.util.Calendar.MINUTE)
+        }
+    } catch (_: Exception) {
+        // si el formato no matchea, se deja en null y el formulario usa "Hoy"/"Ahora"
+    }
+
+    return TransactionFormInitialValues(
+        type = split.type,
+        amount = split.amount.trimStart('-'),
+        description = split.description,
+        otherParty = if (split.type == "withdrawal") split.destinationName ?: "" else split.sourceName ?: "",
+        category = split.categoryName ?: "",
+        notes = split.notes ?: "",
+        accountId = if (split.type == "withdrawal") split.sourceId else split.destinationId,
+        budgetName = split.budgetName,
+        dateMillis = dateMillis,
+        hour = hour,
+        minute = minute
+    )
 }
 
 @Composable
@@ -251,88 +313,6 @@ private fun TransactionDetailContent(
 }
 
 @Composable
-private fun TransactionEditForm(
-    split: TransactionSplit,
-    onCancel: () -> Unit,
-    onSave: (
-        date: String,
-        amount: String,
-        description: String,
-        category: String?,
-        budget: String?,
-        notes: String?
-    ) -> Unit
-) {
-    var description by remember(split) { mutableStateOf(split.description) }
-    var amount by remember(split) { mutableStateOf(split.amount.trimStart('-')) }
-    var date by remember(split) { mutableStateOf(split.date.take(10)) }
-    var category by remember(split) { mutableStateOf(split.categoryName ?: "") }
-    var budget by remember(split) { mutableStateOf(split.budgetName ?: "") }
-    var notes by remember(split) { mutableStateOf(split.notes ?: "") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        FormSection(title = "Editar información") {
-            SleekTextField(value = description, onValueChange = { description = it }, label = "Descripción")
-            Spacer(modifier = Modifier.height(10.dp))
-            SleekTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = "Monto",
-                keyboardType = KeyboardType.Decimal
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            SleekTextField(value = date, onValueChange = { date = it }, label = "Fecha (AAAA-MM-DD)")
-            Spacer(modifier = Modifier.height(10.dp))
-            SleekTextField(value = category, onValueChange = { category = it }, label = "Categoría")
-            Spacer(modifier = Modifier.height(10.dp))
-            SleekTextField(value = budget, onValueChange = { budget = it }, label = "Presupuesto")
-            Spacer(modifier = Modifier.height(10.dp))
-            SleekTextField(value = notes, onValueChange = { notes = it }, label = "Notas")
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedButton(
-                onClick = onCancel,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Cancelar")
-            }
-            Button(
-                onClick = {
-                    onSave(
-                        date,
-                        amount,
-                        description,
-                        category.ifBlank { null },
-                        budget.ifBlank { null },
-                        notes.ifBlank { null }
-                    )
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Guardar")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(40.dp))
-    }
-}
-
-@Composable
 private fun FormSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Text(
         title,
@@ -368,25 +348,6 @@ private fun DetailRow(label: String, value: String) {
             fontWeight = FontWeight.SemiBold
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SleekTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    keyboardType: KeyboardType = KeyboardType.Text
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(10.dp)
-    )
 }
 
 private fun transactionTypeLabel(type: String): String = when (type) {

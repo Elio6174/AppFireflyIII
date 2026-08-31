@@ -8,6 +8,7 @@ import com.example.appfireflyiii.data.model.TransactionSplit
 import com.example.appfireflyiii.data.model.TransactionSplitUpdateRequest
 import com.example.appfireflyiii.data.model.TransactionUpdateRequest
 import com.example.appfireflyiii.data.repository.TransactionRepository
+import com.example.appfireflyiii.ui.screens.newtransaction.SaveState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -15,8 +16,6 @@ import kotlinx.coroutines.launch
 sealed class TransactionDetailUiState {
     data object Loading : TransactionDetailUiState()
     data class Loaded(val group: TransactionGroup, val split: TransactionSplit) : TransactionDetailUiState()
-    data object Saving : TransactionDetailUiState()
-    data object Saved : TransactionDetailUiState()
     data object Deleting : TransactionDetailUiState()
     data object Deleted : TransactionDetailUiState()
     data class Error(val message: String) : TransactionDetailUiState()
@@ -30,6 +29,11 @@ class TransactionDetailViewModel(
 
     private val _uiState = MutableStateFlow<TransactionDetailUiState>(TransactionDetailUiState.Loading)
     val uiState: StateFlow<TransactionDetailUiState> = _uiState
+
+    // Estado dedicado solo a la acción de guardar (edición), separado del estado de carga/borrado,
+    // así el formulario reciclado de Nueva Transacción puede usarlo tal cual espera SaveState.
+    private val _saveState = MutableStateFlow<SaveState>(SaveState.Idle)
+    val saveState: StateFlow<SaveState> = _saveState
 
     init {
         load()
@@ -55,33 +59,54 @@ class TransactionDetailViewModel(
     }
 
     fun save(
+        type: String,
         date: String,
         amount: String,
         description: String,
+        sourceId: String?,
+        destinationName: String?,
+        sourceName: String?,
+        destinationId: String?,
         categoryName: String?,
         budgetName: String?,
-        notes: String?
+        notes: String?,
+        tags: List<String>?,
+        foreignAmount: String?,
+        foreignCurrencyCode: String?,
+        applyRules: Boolean,
+        fireWebhooks: Boolean
     ) {
-        val current = (_uiState.value as? TransactionDetailUiState.Loaded) ?: return
         viewModelScope.launch {
-            _uiState.value = TransactionDetailUiState.Saving
+            _saveState.value = SaveState.Saving
             val request = TransactionUpdateRequest(
+                applyRules = applyRules,
+                fireWebhooks = fireWebhooks,
                 transactions = listOf(
                     TransactionSplitUpdateRequest(
                         journalId = journalId,
-                        type = current.split.type,
+                        type = type,
                         date = date,
                         amount = amount,
                         description = description,
+                        sourceId = sourceId,
+                        sourceName = sourceName,
+                        destinationId = destinationId,
+                        destinationName = destinationName?.ifBlank { null },
                         categoryName = categoryName?.ifBlank { null },
                         budgetName = budgetName?.ifBlank { null },
-                        notes = notes?.ifBlank { null }
+                        notes = notes?.ifBlank { null },
+                        tags = tags?.takeIf { it.isNotEmpty() },
+                        foreignAmount = foreignAmount?.ifBlank { null },
+                        foreignCurrencyCode = foreignCurrencyCode?.ifBlank { null }
                     )
                 )
             )
             repository.updateTransaction(groupId, request)
-                .onSuccess { _uiState.value = TransactionDetailUiState.Saved }
-                .onFailure { _uiState.value = TransactionDetailUiState.Error(it.message ?: "Error al guardar") }
+                .onSuccess {
+                    _saveState.value = SaveState.Success
+                    load() // refresca los datos mostrados con lo recién guardado
+                }
+                .onFailure { _saveState.value = SaveState.Error(it.message ?: "Error al guardar") }
         }
     }
 

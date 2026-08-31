@@ -86,5 +86,8 @@ data class TransactionSplitUpdateRequest(
     @SerializedName("destination_name") val destinationName: String? = null,
     @SerializedName("category_name") val categoryName: String? = null,
     @SerializedName("budget_name") val budgetName: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val tags: List<String>? = null,
+    @SerializedName("foreign_amount") val foreignAmount: String? = null,
+    @SerializedName("foreign_currency_code") val foreignCurrencyCode: String? = null
 )
