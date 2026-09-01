@@ -471,7 +471,7 @@ fun TransactionFormBody(
             }
         }
 
-        Spacer(modifier = Modifier.height(120.dp))
+        Spacer(modifier = Modifier.height(24.dp))
     }
 
     if (showDatePicker) {
@@ -551,7 +551,6 @@ fun OptionCheckboxRow(label: String, checked: Boolean, onCheckedChange: (Boolean
     }
 }
 
-/** Igual que FormSection, pero el encabezado es clickeable y el contenido se muestra/oculta. */
 @Composable
 fun CollapsibleSection(
     title: String,

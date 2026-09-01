@@ -23,6 +23,8 @@ import com.example.appfireflyiii.ui.theme.AssetColor
 import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.formatAmount
 import com.example.appfireflyiii.util.formatRelativeDate
+import com.example.appfireflyiii.ui.theme.TextLightGray
+import com.example.appfireflyiii.ui.theme.TextLightGrayDim
 
 @Composable
 fun TransactionsScreen(
@@ -47,7 +49,8 @@ fun TransactionsScreen(
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = TextLightGray
             )
         }
 
@@ -129,7 +132,8 @@ fun MonthSelector(
         Text(
             monthLabel,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = TextLightGray
         )
         IconButton(onClick = onNext, enabled = canGoForward) {
             Icon(
@@ -158,7 +162,7 @@ fun TransactionCard(
                 indication = null,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -170,12 +174,13 @@ fun TransactionCard(
                 Text(
                     transaction.description,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextLightGray
                 )
                 Text(
                     "${transaction.categoryName ?: "Sin categoría"} · ${formatRelativeDate(transaction.date)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = TextLightGrayDim
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
