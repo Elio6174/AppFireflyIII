@@ -32,6 +32,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.icons.filled.ArrowForward
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,18 +186,21 @@ fun DashboardContent(data: DashboardData, navController: NavController) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Movimientos recientes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 TextButton(onClick = { navController.navigate(Screen.Transactions.createRoute()) }) {
-                    Text("Ver todo")
+                    Text("Ver todos")
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(Icons.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                 }
             }
         }
 
         if (data.recentTransactions.isEmpty()) {
             Text(
-                "Sin movimientos recientes.",
+                "No hay movimientos este mes.",
                 modifier = Modifier.padding(20.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

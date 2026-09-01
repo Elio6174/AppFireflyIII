@@ -40,6 +40,7 @@ class DashboardViewModel(
         loadDashboard()
     }
 
+
     fun loadDashboard() {
         viewModelScope.launch {
             _uiState.value = DashboardUiState.Loading
@@ -47,7 +48,6 @@ class DashboardViewModel(
             val accountsResult = accountRepository.getAccounts()
             val (start, end) = currentMonthRange()
             val monthTransactionsResult = transactionRepository.getTransactionsByRange(start, end)
-            val recentResult = transactionRepository.getTransactions(page = 1)
 
             if (accountsResult.isFailure) {
                 _uiState.value = DashboardUiState.Error(
@@ -85,11 +85,10 @@ class DashboardViewModel(
                 }
             }
 
-            val recentSplits = recentResult.getOrNull()
-                ?.flatMap { group -> group.attributes.transactions.map { it.copy(groupId = group.id) } }
-                ?.sortedByDescending { it.date }
-                ?.take(5)
-                ?: emptyList()
+            val recentSplits = transactionGroups
+                .flatMap { group -> group.attributes.transactions.map { it.copy(groupId = group.id) } }
+                .sortedByDescending { it.date }
+                .take(5)
 
             _uiState.value = DashboardUiState.Success(
                 DashboardData(
