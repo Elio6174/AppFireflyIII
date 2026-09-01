@@ -38,6 +38,7 @@ data class TransactionSplit(
     @SerializedName("budget_id") val budgetId: String?,
     @SerializedName("budget_name") val budgetName: String?,
     val notes: String?,
+    val tags: List<String>? = null,
     val groupId: String? = null
 )
 

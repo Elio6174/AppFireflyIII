@@ -28,22 +28,21 @@ fun formatAccountNumber(number: String): String {
     return number.chunked(4).joinToString(" ")
 }
 
-fun formatRelativeDate(dateString: String): String {
+fun formatShortDate(dateString: String): String {
     val datePart = dateString.take(10) // "yyyy-MM-dd"
-    val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val outputFormat = SimpleDateFormat("dd MMM yyyy", Locale("es", "MX"))
 
-    val today = Calendar.getInstance()
-    val todayStr = format.format(today.time)
+    val date = inputFormat.parse(datePart) ?: return datePart
+    val formatted = outputFormat.format(date)
 
-    val yesterday = Calendar.getInstance()
-    yesterday.add(Calendar.DAY_OF_MONTH, -1)
-    val yesterdayStr = format.format(yesterday.time)
-
-    return when (datePart) {
-        todayStr -> "Hoy"
-        yesterdayStr -> "Ayer"
-        else -> datePart
-    }
+    // El locale es-MX agrega un punto tras el mes abreviado (ej. "15 ago. 2026"); lo quitamos
+    // y ponemos la primera letra del mes en mayúscula (ej. "15 Ago 2026").
+    return formatted.replace(".", "")
+        .split(" ")
+        .joinToString(" ") { part ->
+            if (part.length == 3 && part[0].isLetter()) part.replaceFirstChar { it.uppercase() } else part
+        }
 }
 
 fun currentMonthLabel(): String {

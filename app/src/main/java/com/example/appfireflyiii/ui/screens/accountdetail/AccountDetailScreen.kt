@@ -38,11 +38,11 @@ import com.example.appfireflyiii.ui.theme.AssetColor
 import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.currentMonthLabel
 import com.example.appfireflyiii.util.formatAmount
-import com.example.appfireflyiii.util.formatRelativeDate
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.composed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.appfireflyiii.util.formatShortDate
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -371,9 +371,11 @@ fun AccountTransactionRow(split: TransactionSplit, onClick: () -> Unit = {}) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(split.description, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    "${split.categoryName ?: "Sin categoría"} · ${formatRelativeDate(split.date)}",
+                    "${split.categoryName ?: "Sin categoría"} · ${formatShortDate(split.date)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))

@@ -1,5 +1,6 @@
 package com.example.appfireflyiii.ui.screens.transactions
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -18,13 +19,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.ui.draw.clip
 import com.example.appfireflyiii.navigation.Screen
 import com.example.appfireflyiii.ui.theme.AssetColor
 import com.example.appfireflyiii.ui.theme.RedExpense
 import com.example.appfireflyiii.util.formatAmount
-import com.example.appfireflyiii.util.formatRelativeDate
 import com.example.appfireflyiii.ui.theme.TextLightGray
 import com.example.appfireflyiii.ui.theme.TextLightGrayDim
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.appfireflyiii.util.formatShortDate
 
 @Composable
 fun TransactionsScreen(
@@ -175,20 +178,66 @@ fun TransactionCard(
                     transaction.description,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = TextLightGray
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "${transaction.categoryName ?: "Sin categoría"} · ${formatRelativeDate(transaction.date)}",
+                    "${transaction.categoryName ?: "Sin categoría"} · ${formatShortDate(transaction.date)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextLightGrayDim
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
             Spacer(modifier = Modifier.width(12.dp))
+
+            Column(horizontalAlignment = Alignment.End) {
+                if (!transaction.tags.isNullOrEmpty()) {
+                    TagChips(tags = transaction.tags, modifier = Modifier.widthIn(max = 110.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+                Text(
+                    "$amountPrefix${formatAmount(transaction.amount, transaction.currencySymbol)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Normal,
+                    color = amountColor
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TagChips(tags: List<String>, modifier: Modifier = Modifier) {
+    val visibleTags = tags.take(2)
+    val extraCount = tags.size - visibleTags.size
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End)
+    ) {
+        visibleTags.forEach { tag ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    tag,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (extraCount > 0) {
             Text(
-                "$amountPrefix${formatAmount(transaction.amount, transaction.currencySymbol)}",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = amountColor
+                "+$extraCount",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
