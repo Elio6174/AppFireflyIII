@@ -561,6 +561,102 @@ fun SpendChartPage(data: ReportsData, periodType: ReportPeriod) {
     }
 }
 
+@Composable
+fun SpendLineChart(values: List<Float>, currencySymbol: String, periodType: ReportPeriod) {
+    val lineColor = MaterialTheme.colorScheme.primary
+    val density = LocalDensity.current
+
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    var canvasSize by remember { mutableStateOf(GeoSize.Zero) }
+
+    val minValue = values.min().coerceAtMost(0f)
+    val maxValue = values.max().takeIf { it > 0f } ?: 1f
+    val range = (maxValue - minValue).takeIf { it != 0f } ?: 1f
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .pointerInput(values) {
+                    detectDragGestures(
+                        onDragStart = { offset -> selectedIndex = nearestChartIndex(offset.x, canvasSize.width, values.size) },
+                        onDrag = { change, _ -> selectedIndex = nearestChartIndex(change.position.x, canvasSize.width, values.size) },
+                        onDragEnd = { selectedIndex = null }
+                    )
+                }
+                .pointerInput(values) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            selectedIndex = nearestChartIndex(offset.x, canvasSize.width, values.size)
+                            tryAwaitRelease()
+                            selectedIndex = null
+                        }
+                    )
+                }
+        ) {
+            canvasSize = size
+            val stepX = size.width / (values.size - 1)
+
+            val path = androidx.compose.ui.graphics.Path()
+            values.forEachIndexed { index, value ->
+                val x = index * stepX
+                val y = size.height - ((value - minValue) / range) * size.height
+                if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path = path, color = lineColor, style = Stroke(width = 3.5f))
+
+            values.forEachIndexed { index, value ->
+                val x = index * stepX
+                val y = size.height - ((value - minValue) / range) * size.height
+                drawCircle(color = lineColor, radius = 4f, center = Offset(x, y))
+            }
+
+            selectedIndex?.let { idx ->
+                val x = idx * stepX
+                val y = size.height - ((values[idx] - minValue) / range) * size.height
+                drawLine(
+                    color = lineColor.copy(alpha = 0.3f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, size.height),
+                    strokeWidth = 2f
+                )
+                drawCircle(color = lineColor, radius = 8f, center = Offset(x, y))
+                drawCircle(color = Color.White, radius = 3f, center = Offset(x, y))
+            }
+        }
+
+        selectedIndex?.let { idx ->
+            val stepX = if (canvasSize.width > 0) canvasSize.width / (values.size - 1) else 0f
+            val xPx = idx * stepX
+            val xDp = with(density) { xPx.toDp() }
+            val tooltipOffsetX = (xDp - 55.dp).coerceAtLeast(0.dp)
+
+            Box(
+                modifier = Modifier
+                    .offset(x = tooltipOffsetX, y = 4.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.inverseSurface)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Column {
+                    Text(
+                        chartIndexLabel(idx, periodType),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        "$currencySymbol${"%,.2f".format(values[idx])}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.inverseOnSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun Modifier.verticalScrollColumn(): Modifier = composed {
     this.verticalScroll(rememberScrollState())
 }
