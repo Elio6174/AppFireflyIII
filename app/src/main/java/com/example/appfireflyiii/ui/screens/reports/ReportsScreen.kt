@@ -680,3 +680,50 @@ fun CategoryPieChartPage(data: ReportsData, periodType: ReportPeriod) {
         }
     }
 }
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun CarouselCard(
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    pageCount: Int,
+    pageContent: @Composable (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(vertical = 12.dp)
+                .animateContentSize()
+        ) {
+            HeightAdaptivePager(pagerState = pagerState, pageContent = pageContent)
+
+            if (pageCount > 1) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    repeat(pageCount) { index ->
+                        val selected = pagerState.currentPage == index
+                        Box(
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .size(if (selected) 10.dp else 8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
