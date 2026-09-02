@@ -3,14 +3,18 @@ package com.example.appfireflyiii.ui.screens.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.TransactionRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 enum class ReportPeriod { MONTH, YEAR }
 
@@ -20,7 +24,14 @@ data class CategorySpend(
     val fraction: Float
 )
 
+data class AccountBalanceSeries(
+    val accountId: String,
+    val accountName: String,
+    val values: List<Float>
+)
+
 data class ReportsData(
+    val accountBalances: List<AccountBalanceSeries>,
     val categories: List<CategorySpend>,
     val spendSeries: List<Float>,
     val totalExpense: BigDecimal,
@@ -39,7 +50,8 @@ sealed class ReportsUiState {
 }
 
 class ReportsViewModel(
-    private val repository: TransactionRepository
+    private val repository: TransactionRepository,
+    private val accountRepository: AccountRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReportsUiState>(ReportsUiState.Loading)
@@ -79,69 +91,131 @@ class ReportsViewModel(
 
             val range = if (periodType == ReportPeriod.MONTH) monthRange() else yearRange()
 
-            repository.getTransactionsByRange(range.start, range.end)
-                .onSuccess { groups ->
-                    var currencySymbol = "$"
-                    val categoryTotals = mutableMapOf<String, BigDecimal>()
-                    val bucketTotals = MutableList(range.bucketCount) { BigDecimal.ZERO }
+            val transactionsResult = repository.getTransactionsByRange(range.start, range.end)
+            if (transactionsResult.isFailure) {
+                _uiState.value = ReportsUiState.Error(
+                    transactionsResult.exceptionOrNull()?.message ?: "Error desconocido"
+                )
+                return@launch
+            }
 
-                    groups.forEach { group ->
-                        group.attributes.transactions.forEach { split ->
-                            if (split.type != "withdrawal") return@forEach
+            val groups = transactionsResult.getOrThrow()
 
-                            val amount = split.amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
-                            split.currencySymbol?.let { currencySymbol = it }
+            var currencySymbol = "$"
+            val categoryTotals = mutableMapOf<String, BigDecimal>()
+            val bucketTotals = MutableList(range.bucketCount) { BigDecimal.ZERO }
 
-                            val categoryName = split.categoryName ?: "Sin categoría"
-                            categoryTotals[categoryName] =
-                                (categoryTotals[categoryName] ?: BigDecimal.ZERO) + amount
+            groups.forEach { group ->
+                group.attributes.transactions.forEach { split ->
+                    if (split.type != "withdrawal") return@forEach
 
-                            val bucketIndex = if (periodType == ReportPeriod.MONTH) {
-                                split.date.take(10).takeLast(2).toIntOrNull()?.minus(1)
-                            } else {
-                                split.date.take(10).substring(5, 7).toIntOrNull()?.minus(1)
-                            }
-                            if (bucketIndex != null && bucketIndex in 0 until range.bucketCount) {
-                                bucketTotals[bucketIndex] = bucketTotals[bucketIndex] + amount
+                    val amount = split.amount.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                    split.currencySymbol?.let { currencySymbol = it }
+
+                    val categoryName = split.categoryName ?: "Sin categoría"
+                    categoryTotals[categoryName] =
+                        (categoryTotals[categoryName] ?: BigDecimal.ZERO) + amount
+
+                    val bucketIndex = bucketIndexFor(split.date)
+                    if (bucketIndex != null && bucketIndex in 0 until range.bucketCount) {
+                        bucketTotals[bucketIndex] = bucketTotals[bucketIndex] + amount
+                    }
+                }
+            }
+
+            val sorted = categoryTotals.entries.sortedByDescending { it.value }
+            val top = sorted.take(5)
+            val restSum = sorted.drop(5).fold(BigDecimal.ZERO) { acc, e -> acc + e.value }
+
+            val finalCategories = top.map { it.key to it.value }.toMutableList()
+            if (restSum > BigDecimal.ZERO) finalCategories.add("Otros" to restSum)
+
+            val maxAmount = finalCategories.maxOfOrNull { it.second } ?: BigDecimal.ONE
+            val categorySpends = finalCategories.map { (name, amount) ->
+                CategorySpend(
+                    name = name,
+                    amount = amount,
+                    fraction = if (maxAmount > BigDecimal.ZERO)
+                        (amount.toFloat() / maxAmount.toFloat()) else 0f
+                )
+            }
+
+            val totalExpense = categoryTotals.values.fold(BigDecimal.ZERO) { a, b -> a + b }
+
+            val accountBalances = loadAccountBalances(range)
+
+            val canGoForward = if (periodType == ReportPeriod.MONTH) monthOffset < 0 else yearOffset < 0
+
+            _uiState.value = ReportsUiState.Success(
+                data = ReportsData(
+                    accountBalances = accountBalances,
+                    categories = categorySpends,
+                    spendSeries = bucketTotals.map { it.toFloat() },
+                    totalExpense = totalExpense,
+                    currencySymbol = currencySymbol
+                ),
+                periodLabel = range.label,
+                periodType = periodType,
+                canGoForward = canGoForward
+            )
+        }
+    }
+
+    private suspend fun loadAccountBalances(range: RangeInfo): List<AccountBalanceSeries> = coroutineScope {
+        val accountsResult = accountRepository.getAccounts()
+        val relevantAccounts = accountsResult.getOrNull()?.filter {
+            it.attributes.type == "asset" || it.attributes.type == "liabilities" || it.attributes.type == "liability"
+        } ?: return@coroutineScope emptyList()
+
+        val deferredSeries = relevantAccounts.map { account ->
+            async {
+                val currentBalance = account.attributes.currentBalance.toDoubleOrNull() ?: 0.0
+
+                accountRepository.getAccountTransactions(account.id, range.start, range.end)
+                    .getOrNull()
+                    ?.let { groups ->
+                        val dailyNet = DoubleArray(range.bucketCount)
+
+                        groups.forEach { group ->
+                            group.attributes.transactions.forEach { split ->
+                                val amount = split.amount.toDoubleOrNull() ?: 0.0
+                                val bucketIndex = bucketIndexFor(split.date) ?: return@forEach
+                                if (bucketIndex !in 0 until range.bucketCount) return@forEach
+
+                                val isSource = split.sourceId == account.id
+                                val isDestination = split.destinationId == account.id
+
+                                when {
+                                    isSource -> dailyNet[bucketIndex] -= amount
+                                    isDestination -> dailyNet[bucketIndex] += amount
+                                }
                             }
                         }
-                    }
 
-                    val sorted = categoryTotals.entries.sortedByDescending { it.value }
-                    val top = sorted.take(5)
-                    val restSum = sorted.drop(5).fold(BigDecimal.ZERO) { acc, e -> acc + e.value }
+                        val balance = DoubleArray(range.bucketCount)
+                        var suffixSum = 0.0
+                        for (i in range.bucketCount - 1 downTo 0) {
+                            balance[i] = currentBalance - suffixSum
+                            suffixSum += dailyNet[i]
+                        }
 
-                    val finalCategories = top.map { it.key to it.value }.toMutableList()
-                    if (restSum > BigDecimal.ZERO) finalCategories.add("Otros" to restSum)
-
-                    val maxAmount = finalCategories.maxOfOrNull { it.second } ?: BigDecimal.ONE
-                    val categorySpends = finalCategories.map { (name, amount) ->
-                        CategorySpend(
-                            name = name,
-                            amount = amount,
-                            fraction = if (maxAmount > BigDecimal.ZERO)
-                                (amount.toFloat() / maxAmount.toFloat()) else 0f
+                        AccountBalanceSeries(
+                            accountId = account.id,
+                            accountName = account.attributes.name,
+                            values = balance.map { it.toFloat() }
                         )
                     }
+            }
+        }
 
-                    val totalExpense = categoryTotals.values.fold(BigDecimal.ZERO) { a, b -> a + b }
-                    val canGoForward = if (periodType == ReportPeriod.MONTH) monthOffset < 0 else yearOffset < 0
+        deferredSeries.awaitAll().filterNotNull()
+    }
 
-                    _uiState.value = ReportsUiState.Success(
-                        data = ReportsData(
-                            categories = categorySpends,
-                            spendSeries = bucketTotals.map { it.toFloat() },
-                            totalExpense = totalExpense,
-                            currencySymbol = currencySymbol
-                        ),
-                        periodLabel = range.label,
-                        periodType = periodType,
-                        canGoForward = canGoForward
-                    )
-                }
-                .onFailure { error ->
-                    _uiState.value = ReportsUiState.Error(error.message ?: "Error desconocido")
-                }
+    private fun bucketIndexFor(dateString: String): Int? {
+        return if (periodType == ReportPeriod.MONTH) {
+            dateString.take(10).takeLast(2).toIntOrNull()?.minus(1)
+        } else {
+            dateString.take(10).substring(5, 7).toIntOrNull()?.minus(1)
         }
     }
 
@@ -183,10 +257,11 @@ class ReportsViewModel(
 }
 
 class ReportsViewModelFactory(
-    private val repository: TransactionRepository
+    private val repository: TransactionRepository,
+    private val accountRepository: AccountRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         @Suppress("UNCHECKED_CAST")
-        return ReportsViewModel(repository) as T
+        return ReportsViewModel(repository, accountRepository) as T
     }
 }

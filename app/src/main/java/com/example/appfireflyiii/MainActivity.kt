@@ -93,7 +93,7 @@ fun FireflyApp(activity: FragmentActivity) {
     val transactionsViewModelFactory = remember { TransactionsViewModelFactory(transactionRepository) }
     val dashboardViewModelFactory = remember { DashboardViewModelFactory(accountRepository, transactionRepository) }
     val newTransactionViewModelFactory = remember { NewTransactionViewModelFactory(transactionRepository) }
-    val reportsViewModelFactory = remember { ReportsViewModelFactory(transactionRepository) }
+    val reportsViewModelFactory = remember { ReportsViewModelFactory(transactionRepository, accountRepository) }
     val budgetRepository = remember { BudgetRepository(fireflyApi) }
 
     var isAuthenticated by remember { mutableStateOf(false) }
