@@ -181,42 +181,25 @@ fun ReportPeriodControls(
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
-    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = periodType == ReportPeriod.MONTH,
-                onClick = { onPeriodTypeChange(ReportPeriod.MONTH) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-            ) { Text("Por mes") }
-            SegmentedButton(
-                selected = periodType == ReportPeriod.YEAR,
-                onClick = { onPeriodTypeChange(ReportPeriod.YEAR) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-            ) { Text("Por año") }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.Filled.ChevronLeft, contentDescription = "Mes anterior")
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onPrevious) {
-                Icon(Icons.Filled.ChevronLeft, contentDescription = "Anterior")
-            }
-            Text(
-                periodLabel,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+        Text(
+            periodLabel,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        IconButton(onClick = onNext, enabled = canGoForward) {
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = "Mes siguiente",
+                tint = if (canGoForward) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
-            IconButton(onClick = onNext, enabled = canGoForward) {
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    contentDescription = "Siguiente",
-                    tint = if (canGoForward) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                )
-            }
         }
     }
 }
