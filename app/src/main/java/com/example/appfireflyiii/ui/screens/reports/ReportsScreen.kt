@@ -7,6 +7,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +27,9 @@ private val chartColors = listOf(
     Color(0xFF2196F3), Color(0xFFE91E63), Color(0xFF9E9E9E)
 )
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private val monthAbbrev = listOf("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
+
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ReportsScreen(
     navController: NavController,
@@ -52,7 +57,18 @@ fun ReportsScreen(
             is ReportsUiState.Success -> {
                 val pagerState = rememberPagerState(pageCount = { 2 })
 
-                Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp)) {
+                Column(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
+                    ReportPeriodControls(
+                        periodType = state.periodType,
+                        periodLabel = state.periodLabel,
+                        canGoForward = state.canGoForward,
+                        onPeriodTypeChange = { viewModel.setPeriodType(it) },
+                        onPrevious = { viewModel.previousPeriod() },
+                        onNext = { viewModel.nextPeriod() }
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.Center
@@ -79,8 +95,8 @@ fun ReportsScreen(
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         when (page) {
-                            0 -> CategoryBreakdownPage(state.data)
-                            1 -> DailySpendPage(state.data)
+                            0 -> CategoryBreakdownPage(state.data, state.periodType)
+                            1 -> SpendChartPage(state.data, state.periodType)
                         }
                     }
                 }
@@ -89,20 +105,72 @@ fun ReportsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoryBreakdownPage(data: ReportsData) {
+fun ReportPeriodControls(
+    periodType: ReportPeriod,
+    periodLabel: String,
+    canGoForward: Boolean,
+    onPeriodTypeChange: (ReportPeriod) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = periodType == ReportPeriod.MONTH,
+                onClick = { onPeriodTypeChange(ReportPeriod.MONTH) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) { Text("Por mes") }
+            SegmentedButton(
+                selected = periodType == ReportPeriod.YEAR,
+                onClick = { onPeriodTypeChange(ReportPeriod.YEAR) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) { Text("Por año") }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.Filled.ChevronLeft, contentDescription = "Anterior")
+            }
+            Text(
+                periodLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            IconButton(onClick = onNext, enabled = canGoForward) {
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = "Siguiente",
+                    tint = if (canGoForward) LocalContentColor.current else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryBreakdownPage(data: ReportsData, periodType: ReportPeriod) {
+    val periodWord = if (periodType == ReportPeriod.MONTH) "mes" else "año"
+
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
         Text("Gastos por categoría", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "Total del mes: ${data.currencySymbol}${data.totalExpense.setScale(2)}",
+            "Total del $periodWord: ${data.currencySymbol}${data.totalExpense.setScale(2)}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(24.dp))
 
         if (data.categories.isEmpty()) {
-            Text("Sin gastos registrados este mes.")
+            Text("Sin gastos registrados en este período.")
         }
 
         data.categories.forEachIndexed { index, category ->
@@ -141,19 +209,23 @@ fun CategoryBreakdownPage(data: ReportsData) {
 }
 
 @Composable
-fun DailySpendPage(data: ReportsData) {
+fun SpendChartPage(data: ReportsData, periodType: ReportPeriod) {
+    val title = if (periodType == ReportPeriod.MONTH) "Gasto por día" else "Gasto por mes"
+    val subtitle = if (periodType == ReportPeriod.MONTH) "Este mes" else "Este año"
+    val unitWord = if (periodType == ReportPeriod.MONTH) "día" else "mes"
+
     Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
-        Text("Gasto por día", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "Este mes",
+            subtitle,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(24.dp))
 
         val barColor = MaterialTheme.colorScheme.primary
-        val values = data.dailySpend
+        val values = data.spendSeries
         val maxValue = values.maxOrNull()?.takeIf { it > 0f } ?: 1f
 
         Canvas(
@@ -186,17 +258,27 @@ fun DailySpendPage(data: ReportsData) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("1", style = MaterialTheme.typography.labelSmall)
-            Text("${values.size}", style = MaterialTheme.typography.labelSmall)
+            if (periodType == ReportPeriod.MONTH) {
+                Text("1", style = MaterialTheme.typography.labelSmall)
+                Text("${values.size}", style = MaterialTheme.typography.labelSmall)
+            } else {
+                Text("Ene", style = MaterialTheme.typography.labelSmall)
+                Text("Dic", style = MaterialTheme.typography.labelSmall)
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        val peakDay = values.indexOf(values.maxOrNull() ?: 0f) + 1
+        val peakIndex = values.indexOf(values.maxOrNull() ?: 0f)
         val peakAmount = values.maxOrNull() ?: 0f
         if (peakAmount > 0f) {
+            val peakLabel = if (periodType == ReportPeriod.MONTH) {
+                "día ${peakIndex + 1}"
+            } else {
+                monthAbbrev.getOrElse(peakIndex) { "" }
+            }
             Text(
-                "Día con más gasto: día $peakDay (${data.currencySymbol}${"%.2f".format(peakAmount)})",
+                "${unitWord.replaceFirstChar { it.uppercase() }} con más gasto: $peakLabel (${data.currencySymbol}${"%.2f".format(peakAmount)})",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
