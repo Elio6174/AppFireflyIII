@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -102,7 +101,8 @@ fun ReportsScreen(
                 }
             }
             is ReportsUiState.Success -> {
-                val pagerState = rememberPagerState(pageCount = { 2 })
+                val categoriesPagerState = rememberPagerState(pageCount = { 2 })
+                val spendPagerState = rememberPagerState(pageCount = { 1 })
 
                 Column(
                     modifier = Modifier
@@ -110,11 +110,18 @@ fun ReportsScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(top = 16.dp, bottom = 24.dp)
                 ) {
+                    Text(
+                        "Reportes",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     ReportPeriodControls(
-                        periodType = state.periodType,
                         periodLabel = state.periodLabel,
                         canGoForward = state.canGoForward,
-                        onPeriodTypeChange = { viewModel.setPeriodType(it) },
                         onPrevious = { viewModel.previousPeriod() },
                         onNext = { viewModel.nextPeriod() }
                     )
@@ -123,46 +130,18 @@ fun ReportsScreen(
                     AccountBalancesSection(state.data, state.periodType)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(vertical = 12.dp)
-                                .animateContentSize()
-                        ) {
-                            HeightAdaptivePager(pagerState = pagerState) { page ->
-                                when (page) {
-                                    0 -> CategoryPieChartPage(state.data, state.periodType)
-                                    1 -> CategoryBreakdownPage(state.data, state.periodType)
-                                }
-                            }
+                    CarouselCard(pagerState = categoriesPagerState, pageCount = 2) { page ->
+                        when (page) {
+                            0 -> CategoryPieChartPage(state.data, state.periodType)
+                            1 -> CategoryBreakdownPage(state.data, state.periodType)
+                        }
+                    }
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                repeat(2) { index ->
-                                    val selected = pagerState.currentPage == index
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(4.dp)
-                                            .size(if (selected) 10.dp else 8.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                if (selected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.surfaceVariant
-                                            )
-                                    )
-                                }
-                            }
+                    CarouselCard(pagerState = spendPagerState, pageCount = 1) { page ->
+                        when (page) {
+                            0 -> SpendChartPage(state.data, state.periodType)
                         }
                     }
                 }
@@ -174,10 +153,8 @@ fun ReportsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportPeriodControls(
-    periodType: ReportPeriod,
     periodLabel: String,
     canGoForward: Boolean,
-    onPeriodTypeChange: (ReportPeriod) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
@@ -500,33 +477,13 @@ fun SpendChartPage(data: ReportsData, periodType: ReportPeriod) {
         )
         Spacer(modifier = Modifier.height(24.dp))
 
-        val barColor = MaterialTheme.colorScheme.primary
         val values = data.spendSeries
-        val maxValue = values.maxOrNull()?.takeIf { it > 0f } ?: 1f
-
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-        ) {
-            if (values.isEmpty()) return@Canvas
-
-            val barCount = values.size
-            val gap = 2.dp.toPx()
-            val barWidth = (size.width - gap * (barCount - 1)) / barCount
-
-            values.forEachIndexed { index, value ->
-                val barHeight = (value / maxValue) * size.height
-                val left = index * (barWidth + gap)
-                val top = size.height - barHeight
-
-                drawRect(
-                    color = barColor,
-                    topLeft = Offset(left, top),
-                    size = Size(barWidth, barHeight)
-                )
-            }
+        if (values.size < 2) {
+            Text("Sin datos suficientes para mostrar la gráfica.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@Column
         }
+
+        SpendLineChart(values = values, currencySymbol = data.currencySymbol, periodType = periodType)
 
         Spacer(modifier = Modifier.height(8.dp))
 
