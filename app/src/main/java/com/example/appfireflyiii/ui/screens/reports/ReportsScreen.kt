@@ -252,6 +252,7 @@ fun MultiAccountBalanceChart(
     if (plottable.isEmpty()) return
 
     val density = LocalDensity.current
+    val zeroLineColor = MaterialTheme.colorScheme.onSurfaceVariant
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var canvasSize by remember { mutableStateOf(GeoSize.Zero) }
 
@@ -295,6 +296,17 @@ fun MultiAccountBalanceChart(
                     if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 drawPath(path = path, color = color, style = Stroke(width = 3.5f))
+            }
+
+            if (minValue < 0f && maxValue > 0f) {
+                val zeroY = size.height - ((0f - minValue) / range) * size.height
+                drawLine(
+                    color = Color.White.copy(alpha = 0.85f),
+                    start = Offset(0f, zeroY),
+                    end = Offset(size.width, zeroY),
+                    strokeWidth = 2f,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f)
+                )
             }
 
             selectedIndex?.let { idx ->
