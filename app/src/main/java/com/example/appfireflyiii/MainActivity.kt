@@ -82,7 +82,6 @@ fun FireflyApp(activity: FragmentActivity) {
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
 
-    // El pager ahora vive aquí arriba, compartido entre MainTabsScreen y los trampolines.
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(
         pageCount = { bottomNavItems.size }
     )

@@ -10,8 +10,9 @@ class AccountRepository(private val api: FireflyApi) {
 
     suspend fun getAccounts(): Result<List<AccountData>> {
         return try {
-            val response = api.getAccounts()
-            val realAccounts = response.data.filter { it.attributes.type != "initial-balance" }
+            val assets = api.getAccounts(type = "asset").data
+            val liabilities = api.getAccounts(type = "liability").data
+            val realAccounts = (assets + liabilities).filter { it.attributes.type != "initial-balance" }
             Result.success(realAccounts)
         } catch (e: Exception) {
             Result.failure(e)

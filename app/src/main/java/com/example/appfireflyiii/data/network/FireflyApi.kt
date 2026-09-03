@@ -1,5 +1,6 @@
 package com.example.appfireflyiii.data.network
 
+import com.example.appfireflyiii.data.model.AccountData
 import com.example.appfireflyiii.data.model.AccountResponse
 import com.example.appfireflyiii.data.model.AccountSingleResponse
 import com.example.appfireflyiii.data.model.AccountStoreRequest
@@ -22,7 +23,8 @@ interface FireflyApi {
     @GET("api/v1/accounts")
     suspend fun getAccounts(
         @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 50
+        @Query("limit") limit: Int = 50,
+        @Query("type") type: String = "all"
     ): AccountResponse
 
     @GET("api/v1/transactions")
