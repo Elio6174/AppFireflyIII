@@ -9,6 +9,7 @@ import com.example.appfireflyiii.data.model.TransactionStoreRequest
 import com.example.appfireflyiii.data.model.TransactionStoreResponse
 import com.example.appfireflyiii.data.model.TransactionUpdateRequest
 import com.example.appfireflyiii.data.model.BudgetResponse
+import com.example.appfireflyiii.data.model.TagResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -73,4 +74,10 @@ interface FireflyApi {
 
     @GET("api/v1/budgets")
     suspend fun getBudgets(): BudgetResponse
+
+    @GET("api/v1/tags")
+    suspend fun getTags(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 200
+    ): TagResponse
 }

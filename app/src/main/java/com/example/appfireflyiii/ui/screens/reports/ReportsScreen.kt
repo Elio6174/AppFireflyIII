@@ -35,6 +35,9 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 
 private val chartColors = listOf(
     Color(0xFF6750A4), Color(0xFF4CAF50), Color(0xFFFF9800),
@@ -48,12 +51,13 @@ private val monthAbbrev = listOf("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul"
 fun HeightAdaptivePager(
     pagerState: androidx.compose.foundation.pager.PagerState,
     modifier: Modifier = Modifier,
+    contentKey: Any? = null,
     pageContent: @Composable (Int) -> Unit
 ) {
     SubcomposeLayout(modifier = modifier.fillMaxWidth()) { constraints ->
         val unboundedConstraints = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
 
-        val measuredHeight = subcompose("measure-${pagerState.currentPage}") {
+        val measuredHeight = subcompose("measure-${pagerState.currentPage}-$contentKey") {
             pageContent(pagerState.currentPage)
         }.map { it.measure(unboundedConstraints) }
             .maxOfOrNull { it.height } ?: 0
@@ -102,7 +106,9 @@ fun ReportsScreen(
             }
             is ReportsUiState.Success -> {
                 val categoriesPagerState = rememberPagerState(pageCount = { 2 })
+                val tagsPagerState = rememberPagerState(pageCount = { 1 })
                 val spendPagerState = rememberPagerState(pageCount = { 1 })
+                var showEmptyTags by remember { mutableStateOf(false) }
 
                 Column(
                     modifier = Modifier
@@ -134,6 +140,23 @@ fun ReportsScreen(
                         when (page) {
                             0 -> CategoryPieChartPage(state.data, state.periodType)
                             1 -> CategoryBreakdownPage(state.data, state.periodType)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    CarouselCard(
+                        pagerState = tagsPagerState,
+                        pageCount = 1,
+                        contentKey = showEmptyTags
+                    ) { page ->
+                        when (page) {
+                            0 -> TagSpendPage(
+                                state.data,
+                                state.periodType,
+                                showEmptyTags = showEmptyTags,
+                                onToggleEmptyTags = { showEmptyTags = !showEmptyTags }
+                            )
                         }
                     }
 
@@ -739,6 +762,7 @@ fun CategoryPieChartPage(data: ReportsData, periodType: ReportPeriod) {
 fun CarouselCard(
     pagerState: androidx.compose.foundation.pager.PagerState,
     pageCount: Int,
+    contentKey: Any? = null,
     pageContent: @Composable (Int) -> Unit
 ) {
     Card(
@@ -754,7 +778,7 @@ fun CarouselCard(
                 .padding(vertical = 12.dp)
                 .animateContentSize()
         ) {
-            HeightAdaptivePager(pagerState = pagerState, pageContent = pageContent)
+            HeightAdaptivePager(pagerState = pagerState, contentKey = contentKey, pageContent = pageContent)
 
             if (pageCount > 1) {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -773,6 +797,114 @@ fun CarouselCard(
                                     if (selected) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.surfaceVariant
                                 )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TagSpendPage(data: ReportsData, periodType: ReportPeriod, showEmptyTags: Boolean, onToggleEmptyTags: () -> Unit) {
+    val periodWord = if (periodType == ReportPeriod.MONTH) "mes" else "año"
+    val colors = remember(data.tagSpends.size) { goldenAngleColors(data.tagSpends.size) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .padding(20.dp)
+    ) {
+        Text("Gastos por etiqueta", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Ordenadas de mayor a menor · este $periodWord",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (data.tagSpends.isEmpty()) {
+            Text("Sin gastos etiquetados en este período.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                data.tagSpends.forEachIndexed { index, tag ->
+                    val color = colors.getOrElse(index) { MaterialTheme.colorScheme.primary }
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                tag.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "${data.currencySymbol}${tag.amount.setScale(2)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(tag.fraction.coerceIn(0.02f, 1f))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(color)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (data.tagsWithoutSpend.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onToggleEmptyTags() }
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Etiquetas sin gastos (${data.tagsWithoutSpend.size})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Icon(
+                    if (showEmptyTags) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (showEmptyTags) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    data.tagsWithoutSpend.forEach { tagName ->
+                        Text(
+                            tagName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp)
                         )
                     }
                 }

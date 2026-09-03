@@ -2,9 +2,7 @@ package com.example.appfireflyiii
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.NavHost
@@ -13,38 +11,24 @@ import androidx.navigation.compose.rememberNavController
 import com.example.appfireflyiii.auth.BiometricAuthManager
 import com.example.appfireflyiii.data.local.TokenStorage
 import com.example.appfireflyiii.navigation.Screen
-import com.example.appfireflyiii.ui.components.FireflyBottomNavBar
-import com.example.appfireflyiii.ui.screens.accounts.AccountsScreen
 import com.example.appfireflyiii.ui.screens.auth.LoginScreen
 import com.example.appfireflyiii.ui.screens.auth.TokenSetupScreen
-import com.example.appfireflyiii.ui.screens.dashboard.DashboardScreen
-import com.example.appfireflyiii.ui.screens.more.MoreScreen
-import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionScreen
-import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.appfireflyiii.data.network.FireflyClient
 import com.example.appfireflyiii.data.repository.AccountRepository
-import com.example.appfireflyiii.ui.screens.accounts.AccountsViewModel
 import com.example.appfireflyiii.ui.screens.accounts.AccountsViewModelFactory
 import com.example.appfireflyiii.data.repository.TransactionRepository
 import com.example.appfireflyiii.ui.screens.transactions.TransactionsScreen
 import com.example.appfireflyiii.ui.screens.transactions.TransactionsViewModel
 import com.example.appfireflyiii.ui.screens.transactions.TransactionsViewModelFactory
-import com.example.appfireflyiii.ui.screens.dashboard.DashboardViewModel
 import com.example.appfireflyiii.ui.screens.dashboard.DashboardViewModelFactory
-import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionScreen
-import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewModel
 import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewModelFactory
-import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
-import com.example.appfireflyiii.ui.screens.reports.ReportsViewModel
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModelFactory
 import com.example.appfireflyiii.ui.theme.AppFireflyTheme
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailScreen
-import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailViewModel
-import com.example.appfireflyiii.ui.screens.accountdetail.AccountDetailViewModelFactory
 import com.example.appfireflyiii.ui.screens.editaccount.EditAccountScreen
 import com.example.appfireflyiii.ui.screens.editaccount.EditAccountViewModel
 import com.example.appfireflyiii.ui.screens.editaccount.EditAccountViewModelFactory
@@ -59,10 +43,8 @@ import androidx.compose.ui.Modifier
 import com.example.appfireflyiii.ui.components.MainTabsScreen
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
+import com.example.appfireflyiii.data.repository.TagRepository
 import com.example.appfireflyiii.navigation.bottomNavItems
-import com.example.appfireflyiii.ui.components.MainTabsScreen
 
 
 class MainActivity : FragmentActivity() {
@@ -93,7 +75,8 @@ fun FireflyApp(activity: FragmentActivity) {
     val transactionsViewModelFactory = remember { TransactionsViewModelFactory(transactionRepository) }
     val dashboardViewModelFactory = remember { DashboardViewModelFactory(accountRepository, transactionRepository) }
     val newTransactionViewModelFactory = remember { NewTransactionViewModelFactory(transactionRepository) }
-    val reportsViewModelFactory = remember { ReportsViewModelFactory(transactionRepository, accountRepository) }
+    val tagRepository = remember { TagRepository(fireflyApi) }
+    val reportsViewModelFactory = remember { ReportsViewModelFactory(transactionRepository, accountRepository, tagRepository) }
     val budgetRepository = remember { BudgetRepository(fireflyApi) }
 
     var isAuthenticated by remember { mutableStateOf(false) }

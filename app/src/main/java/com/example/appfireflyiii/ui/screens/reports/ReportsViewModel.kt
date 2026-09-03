@@ -15,8 +15,15 @@ import java.util.Calendar
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.example.appfireflyiii.data.repository.TagRepository
 
 enum class ReportPeriod { MONTH, YEAR }
+
+data class TagSpend(
+    val name: String,
+    val amount: BigDecimal,
+    val fraction: Float
+)
 
 data class CategorySpend(
     val name: String,
@@ -33,6 +40,8 @@ data class AccountBalanceSeries(
 data class ReportsData(
     val accountBalances: List<AccountBalanceSeries>,
     val categories: List<CategorySpend>,
+    val tagSpends: List<TagSpend>,
+    val tagsWithoutSpend: List<String>,
     val spendSeries: List<Float>,
     val totalExpense: BigDecimal,
     val currencySymbol: String
@@ -51,7 +60,8 @@ sealed class ReportsUiState {
 
 class ReportsViewModel(
     private val repository: TransactionRepository,
-    private val accountRepository: AccountRepository
+    private val accountRepository: AccountRepository,
+    private val tagRepository: TagRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ReportsUiState>(ReportsUiState.Loading)
@@ -104,6 +114,7 @@ class ReportsViewModel(
             var currencySymbol = "$"
             val categoryTotals = mutableMapOf<String, BigDecimal>()
             val bucketTotals = MutableList(range.bucketCount) { BigDecimal.ZERO }
+            val tagTotals = mutableMapOf<String, BigDecimal>()
 
             groups.forEach { group ->
                 group.attributes.transactions.forEach { split ->
@@ -120,8 +131,25 @@ class ReportsViewModel(
                     if (bucketIndex != null && bucketIndex in 0 until range.bucketCount) {
                         bucketTotals[bucketIndex] = bucketTotals[bucketIndex] + amount
                     }
+
+                    split.tags?.forEach { tag ->
+                        tagTotals[tag] = (tagTotals[tag] ?: BigDecimal.ZERO) + amount
+                    }
                 }
             }
+
+            val sortedTags = tagTotals.entries.sortedByDescending { it.value }
+            val maxTagAmount = sortedTags.maxOfOrNull { it.value } ?: BigDecimal.ONE
+            val tagSpends = sortedTags.map { (name, amount) ->
+                TagSpend(
+                    name = name,
+                    amount = amount,
+                    fraction = if (maxTagAmount > BigDecimal.ZERO) (amount.toFloat() / maxTagAmount.toFloat()) else 0f
+                )
+            }
+
+            val allTagNames = tagRepository.getTags().getOrNull()?.map { it.attributes.tag } ?: emptyList()
+            val tagsWithoutSpend = allTagNames.filter { it !in tagTotals.keys }.sorted()
 
             val sorted = categoryTotals.entries.sortedByDescending { it.value }
             val top = sorted.take(5)
@@ -150,6 +178,8 @@ class ReportsViewModel(
                 data = ReportsData(
                     accountBalances = accountBalances,
                     categories = categorySpends,
+                    tagSpends = tagSpends,
+                    tagsWithoutSpend = tagsWithoutSpend,
                     spendSeries = bucketTotals.map { it.toFloat() },
                     totalExpense = totalExpense,
                     currencySymbol = currencySymbol
@@ -258,10 +288,11 @@ class ReportsViewModel(
 
 class ReportsViewModelFactory(
     private val repository: TransactionRepository,
-    private val accountRepository: AccountRepository
+    private val accountRepository: AccountRepository,
+    private val tagRepository: TagRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         @Suppress("UNCHECKED_CAST")
-        return ReportsViewModel(repository, accountRepository) as T
+        return ReportsViewModel(repository, accountRepository, tagRepository) as T
     }
 }
