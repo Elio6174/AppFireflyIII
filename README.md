@@ -2,7 +2,7 @@
 
 Aplicación móvil Android, no oficial, para [Firefly III](https://www.firefly-iii.org/), el gestor de finanzas personales de código abierto. Permite consultar y administrar tus cuentas, transacciones, presupuestos y reportes directamente desde el celular, conectándose a tu propia instancia de Firefly III mediante su API REST.
 
-## Capturas de pantalla
+## Capturas de pantalla v1.0.0
 
 <p align="center">
   <img src="imagenes/cuentas.png" width="220" alt="Cuentas" />
@@ -70,6 +70,13 @@ Proyecto en desarrollo activo. Próximas mejoras planeadas:
 - [ ] Soporte multi-moneda más completo en reportes
 - [ ] Notificaciones de presupuesto excedido
 - [ ] Widget de inicio con resumen del mes
+
+
+## Capturas de pantalla de la nueva version en desarrollo v1.0.1
+
+<p align="center">
+  <img src="imagenes/v1.0.1DetalleMovimiento.png" width="220" alt="Detalle movimiento" />
+</p>
 
 ## Licencia
 
