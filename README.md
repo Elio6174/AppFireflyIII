@@ -75,7 +75,7 @@ Proyecto en desarrollo activo. Próximas mejoras planeadas:
 ## Capturas de pantalla de la nueva version en desarrollo v1.0.1
 
 <p align="center">
-  <img src="imagenes/v1.0.1DetalleMovimiento.png" width="220" alt="Detalle movimiento" />
+  <img src="imagenes/v1.0.1DetalleMovimiento.png" width="220" alt="Detalle del movimiento" />
 </p>
 
 ## Licencia
