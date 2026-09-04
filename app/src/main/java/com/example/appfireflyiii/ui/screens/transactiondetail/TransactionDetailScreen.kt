@@ -1,17 +1,24 @@
 package com.example.appfireflyiii.ui.screens.transactiondetail
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
@@ -20,19 +27,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.model.TransactionSplit
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.BudgetRepository
-import com.example.appfireflyiii.ui.screens.newtransaction.SaveState
 import com.example.appfireflyiii.ui.screens.newtransaction.TransactionFormBody
 import com.example.appfireflyiii.ui.screens.newtransaction.TransactionFormInitialValues
-import com.example.appfireflyiii.ui.theme.AssetColor
-import com.example.appfireflyiii.ui.theme.RedExpense
-import com.example.appfireflyiii.util.formatAmount
+import kotlinx.coroutines.launch
+import com.example.appfireflyiii.ui.theme.DetailScreenBg as ScreenBg
+import com.example.appfireflyiii.ui.theme.DetailCardBg as CardBg
+import com.example.appfireflyiii.ui.theme.DetailCardBorder as CardBorder
+import com.example.appfireflyiii.ui.theme.DetailIconBadgeBg as IconBadgeBg
+import com.example.appfireflyiii.ui.theme.DetailIconBadgeTint as IconBadgeTint
+import com.example.appfireflyiii.ui.theme.DetailSectionTitleColor as SectionTitleColor
+import com.example.appfireflyiii.ui.theme.DetailDividerColor as DividerColor
+import com.example.appfireflyiii.ui.theme.DetailLabelGray as LabelGray
+import com.example.appfireflyiii.ui.theme.DetailSubLabelGray as SubLabelGray
+import com.example.appfireflyiii.ui.theme.DetailWithdrawalColor as WithdrawalColor
+import com.example.appfireflyiii.ui.theme.DetailDepositColor as DepositColor
+import com.example.appfireflyiii.ui.theme.DetailTransferColor as TransferColor
+import com.example.appfireflyiii.ui.theme.DetailCategoryIndigo as CategoryIndigo
+import com.example.appfireflyiii.ui.theme.DetailTagAmber as TagAmber
+import com.example.appfireflyiii.ui.theme.DetailDeleteRed as DeleteRed
+import com.example.appfireflyiii.ui.theme.DetailSheetHandleColor as SheetHandleColor
+import com.example.appfireflyiii.ui.theme.DetailCancelButtonBg as CancelButtonBg
+import androidx.compose.material.icons.filled.ArrowDownward
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -46,94 +74,168 @@ fun TransactionDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     var isEditing by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = {
-                if (isEditing) isEditing = false else navController.popBackStack()
-            }) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Volver")
-            }
-            Text(
-                if (isEditing) "Editar movimiento" else "Detalle del movimiento",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
+    val deleteSheetProgress = remember { Animatable(0f) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var deletingSplit by remember { mutableStateOf<TransactionSplit?>(null) }
+    val scope = rememberCoroutineScope()
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (val state = uiState) {
-                is TransactionDetailUiState.Loading, is TransactionDetailUiState.Deleting -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val scale = 1f - 0.08f * deleteSheetProgress.value
+                    scaleX = scale
+                    scaleY = scale
+                    shape = RoundedCornerShape(28.dp * deleteSheetProgress.value)
+                    clip = true
                 }
-                is TransactionDetailUiState.Error -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("No se pudo cargar: ${state.message}")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = { viewModel.load() }) {
-                            Text("Reintentar")
+                .background(ScreenBg)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SquareIconButton(icon = Icons.Filled.ArrowBack, contentDescription = "Volver") {
+                    if (isEditing) isEditing = false else navController.popBackStack()
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (isEditing) "Editar movimiento" else "Detalle del movimiento",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
+                )
+                if (!isEditing) {
+                    val loadedState = uiState as? TransactionDetailUiState.Loaded
+                    SquareIconButton(icon = Icons.Filled.IosShare, contentDescription = "Compartir") {
+                        val split = loadedState?.split ?: return@SquareIconButton
+                        val shareText = buildString {
+                            append(split.description)
+                            append(": ")
+                            append(formatAmountSimple(split.amount, split.currencySymbol))
+                            append(" — ")
+                            append(split.date.take(10))
+                        }
+                        val sendIntent = android.content.Intent().apply {
+                            action = android.content.Intent.ACTION_SEND
+                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                            type = "text/plain"
+                        }
+                        context.startActivity(android.content.Intent.createChooser(sendIntent, null))
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(40.dp))
+                }
+            }
+
+            HorizontalDivider(color = DividerColor, thickness = 1.dp)
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (val state = uiState) {
+                    is TransactionDetailUiState.Loading, is TransactionDetailUiState.Deleting -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    is TransactionDetailUiState.Error -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("No se pudo cargar: ${state.message}", color = Color.White)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = { viewModel.load() }) {
+                                Text("Reintentar")
+                            }
+                        }
+                    }
+                    is TransactionDetailUiState.Deleted -> {
+                        LaunchedEffect(Unit) {
+                            navController.popBackStack()
+                        }
+                    }
+                    is TransactionDetailUiState.Loaded -> {
+                        if (isEditing) {
+                            TransactionFormBody(
+                                title = "Editar movimiento",
+                                submitLabel = "Guardar cambios",
+                                initialValues = initialValuesFrom(state.split),
+                                saveState = saveState,
+                                accountRepository = accountRepository,
+                                budgetRepository = budgetRepository,
+                                onSave = { type, date, amount, description, sourceId, destinationName, sourceName,
+                                           destinationId, categoryName, budgetName, notes, tags, foreignAmount,
+                                           foreignCurrencyCode, applyRules, fireWebhooks ->
+                                    viewModel.save(
+                                        type = type,
+                                        date = date,
+                                        amount = amount,
+                                        description = description,
+                                        sourceId = sourceId,
+                                        destinationName = destinationName,
+                                        sourceName = sourceName,
+                                        destinationId = destinationId,
+                                        categoryName = categoryName,
+                                        budgetName = budgetName,
+                                        notes = notes,
+                                        tags = tags,
+                                        foreignAmount = foreignAmount,
+                                        foreignCurrencyCode = foreignCurrencyCode,
+                                        applyRules = applyRules,
+                                        fireWebhooks = fireWebhooks
+                                    )
+                                },
+                                onSavedNavigateBack = { isEditing = false }
+                            )
+                        } else {
+                            TransactionDetailContent(
+                                split = state.split,
+                                onEditClick = { isEditing = true },
+                                onDeleteRequest = {
+                                    deletingSplit = state.split
+                                    showDeleteConfirm = true
+                                    scope.launch { deleteSheetProgress.animateTo(1f, tween(280)) }
+                                }
+                            )
                         }
                     }
                 }
-                is TransactionDetailUiState.Deleted -> {
-                    LaunchedEffect(Unit) {
-                        navController.popBackStack()
-                    }
-                }
-                is TransactionDetailUiState.Loaded -> {
-                    if (isEditing) {
-                        TransactionFormBody(
-                            title = "Editar movimiento",
-                            submitLabel = "Guardar cambios",
-                            initialValues = initialValuesFrom(state.split),
-                            saveState = saveState,
-                            accountRepository = accountRepository,
-                            budgetRepository = budgetRepository,
-                            onSave = { type, date, amount, description, sourceId, destinationName, sourceName,
-                                       destinationId, categoryName, budgetName, notes, tags, foreignAmount,
-                                       foreignCurrencyCode, applyRules, fireWebhooks ->
-                                viewModel.save(
-                                    type = type,
-                                    date = date,
-                                    amount = amount,
-                                    description = description,
-                                    sourceId = sourceId,
-                                    destinationName = destinationName,
-                                    sourceName = sourceName,
-                                    destinationId = destinationId,
-                                    categoryName = categoryName,
-                                    budgetName = budgetName,
-                                    notes = notes,
-                                    tags = tags,
-                                    foreignAmount = foreignAmount,
-                                    foreignCurrencyCode = foreignCurrencyCode,
-                                    applyRules = applyRules,
-                                    fireWebhooks = fireWebhooks
-                                )
-                            },
-                            // al guardar bien, regresamos a la vista de solo lectura (no salimos de la pantalla)
-                            onSavedNavigateBack = { isEditing = false }
-                        )
-                    } else {
-                        TransactionDetailContent(
-                            split = state.split,
-                            onEditClick = { isEditing = true },
-                            onDelete = { viewModel.delete() }
+            }
+        }
+
+        if (showDeleteConfirm) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                scope.launch {
+                                    deleteSheetProgress.animateTo(0f, tween(220))
+                                    showDeleteConfirm = false
+                                }
+                            }
                         )
                     }
-                }
+            )
+            deletingSplit?.let { split ->
+                DeleteConfirmationSheet(
+                    split = split,
+                    amountPrefix = if (split.type == "withdrawal") "-" else "+",
+                    progress = deleteSheetProgress,
+                    onDismiss = { showDeleteConfirm = false },
+                    onConfirm = {
+                        showDeleteConfirm = false
+                        viewModel.delete()
+                    }
+                )
             }
         }
     }
 }
 
-/** Convierte el split cargado en los valores iniciales que espera el formulario reciclado. */
 private fun initialValuesFrom(split: TransactionSplit): TransactionFormInitialValues {
     var dateMillis: Long? = null
     var hour: Int? = null
@@ -147,9 +249,7 @@ private fun initialValuesFrom(split: TransactionSplit): TransactionFormInitialVa
             hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
             minute = cal.get(java.util.Calendar.MINUTE)
         }
-    } catch (_: Exception) {
-        // si el formato no matchea, se deja en null y el formulario usa "Hoy"/"Ahora"
-    }
+    } catch (_: Exception) { }
 
     return TransactionFormInitialValues(
         type = split.type,
@@ -158,6 +258,7 @@ private fun initialValuesFrom(split: TransactionSplit): TransactionFormInitialVa
         otherParty = if (split.type == "withdrawal") split.destinationName ?: "" else split.sourceName ?: "",
         category = split.categoryName ?: "",
         notes = split.notes ?: "",
+        tagsInput = split.tags?.joinToString(", ") ?: "",
         accountId = if (split.type == "withdrawal") split.sourceId else split.destinationId,
         budgetName = split.budgetName,
         dateMillis = dateMillis,
@@ -170,18 +271,10 @@ private fun initialValuesFrom(split: TransactionSplit): TransactionFormInitialVa
 private fun TransactionDetailContent(
     split: TransactionSplit,
     onEditClick: () -> Unit,
-    onDelete: () -> Unit
+    onDeleteRequest: () -> Unit
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-
     val isExpense = split.type == "withdrawal"
-    val amountColor = if (isExpense) RedExpense else AssetColor
     val amountPrefix = if (isExpense) "-" else "+"
-    val typeIcon = when (split.type) {
-        "withdrawal" -> Icons.Filled.ArrowUpward
-        "deposit" -> Icons.Filled.ArrowDownward
-        else -> Icons.Filled.SwapHoriz
-    }
 
     Column(
         modifier = Modifier
@@ -189,60 +282,91 @@ private fun TransactionDetailContent(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
+        BorderedCard(shape = RoundedCornerShape(28.dp)) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "$amountPrefix${formatAmount(split.amount, split.currencySymbol)}",
+                    "$amountPrefix${formatAmountSimple(split.amount, split.currencySymbol)}",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = amountColor
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     split.description,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
                 )
+                if (!split.journalId.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Id de transacción: #${split.journalId}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SubLabelGray
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        FormSection(title = "Información", icon = Icons.Filled.Info) {
-            DetailRow(label = "Tipo", value = transactionTypeLabel(split.type))
-            DetailRow(label = "Fecha", value = split.date.take(10))
-            DetailRow(label = "Categoría", value = split.categoryName ?: "Sin categoría")
+        SectionCard(title = "INFORMACIÓN", icon = Icons.Filled.Info) {
+            InfoRow(label = "Tipo") { TypeBadge(split.type) }
+            RowDivider()
+            InfoRowPlain(label = "Fecha", value = formatDate(split.date), subvalue = formatTime(split.date))
+
+            if (!split.categoryName.isNullOrBlank()) {
+                RowDivider()
+                InfoRow(label = "Categoría") { Pill(text = split.categoryName, color = CategoryIndigo) }
+            }
+
+            if (!split.tags.isNullOrEmpty()) {
+                RowDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (split.tags.size > 1) "Etiquetas" else "Etiqueta",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LabelGray
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        split.tags.forEach { tag -> Pill(text = tag, color = TagAmber) }
+                    }
+                }
+            }
+
             if (!split.budgetName.isNullOrBlank()) {
-                DetailRow(label = "Presupuesto", value = split.budgetName)
+                RowDivider()
+                InfoRowPlain(label = "Presupuesto", value = split.budgetName)
             }
         }
 
         if (!split.sourceName.isNullOrBlank() || !split.destinationName.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(16.dp))
-            FormSection(title = "Cuentas", icon = Icons.Filled.AccountBalanceWallet) {
+            SectionCard(title = "CUENTAS", icon = Icons.Filled.CreditCard) {
                 if (!split.sourceName.isNullOrBlank()) {
-                    DetailRow(label = "Origen", value = split.sourceName)
+                    AccountRow(label = "ORIGEN", name = split.sourceName)
+                }
+                if (!split.sourceName.isNullOrBlank() && !split.destinationName.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
                 if (!split.destinationName.isNullOrBlank()) {
-                    DetailRow(label = "Destino", value = split.destinationName)
+                    AccountRow(label = "DESTINO", name = split.destinationName)
                 }
             }
         }
 
         if (!split.notes.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(16.dp))
-            FormSection(title = "Notas", icon = Icons.Filled.Notes) {
+            SectionCard(title = "NOTAS", icon = Icons.Filled.Notes) {
                 Text(
                     split.notes,
                     style = MaterialTheme.typography.bodyMedium,
@@ -258,119 +382,368 @@ private fun TransactionDetailContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedButton(
-                onClick = { showDeleteConfirm = true },
+                onClick = { onDeleteRequest() },
                 modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, WithdrawalColor.copy(alpha = 0.45f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = CardBg,
+                    contentColor = WithdrawalColor
+                )
             ) {
                 Text("Eliminar", fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = onEditClick,
                 modifier = Modifier.weight(1f).height(50.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
             ) {
                 Text("Editar", fontWeight = FontWeight.SemiBold)
             }
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(32.dp))
     }
+}
 
-    if (showDeleteConfirm) {
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Text(
-                        "¿Eliminar este movimiento?",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        "Esta acción no se puede deshacer. Se eliminará el movimiento de forma permanente.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.75f)
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
+@Composable
+private fun BoxScope.DeleteConfirmationSheet(
+    split: TransactionSplit,
+    amountPrefix: String,
+    progress: Animatable<Float, AnimationVector1D>,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var sheetHeightPx by remember { mutableStateOf(1f) }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { showDeleteConfirm = false },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Cancelar")
-                        }
-                        Button(
-                            onClick = {
-                                showDeleteConfirm = false
-                                onDelete()
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                        ) {
-                            Text("Eliminar", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .onGloballyPositioned { sheetHeightPx = it.size.height.toFloat().coerceAtLeast(1f) }
+            .graphicsLayer {
+                translationY = (1f - progress.value) * sheetHeightPx
             }
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(CardBg)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            if (progress.value < 0.6f) {
+                                progress.animateTo(0f, tween(220))
+                                onDismiss()
+                            } else {
+                                progress.animateTo(1f, tween(220))
+                            }
+                        }
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        val delta = dragAmount / sheetHeightPx
+                        scope.launch { progress.snapTo((progress.value - delta).coerceIn(0f, 1f)) }
+                    }
+                )
+            }
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .width(40.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(SheetHandleColor)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            "¿Eliminar movimiento?",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            "Esta acción no se puede deshacer. Se actualizarán los balances vinculados a esta transacción.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = LabelGray
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardBg)
+                .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    split.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    formatDate(split.date),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LabelGray
+                )
+            }
+            Text(
+                "$amountPrefix${formatAmountSimple(split.amount, split.currencySymbol)}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Normal,
+                color = if (amountPrefix == "-") WithdrawalColor else DepositColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = DeleteRed)
+        ) {
+            Text("Eliminar definitivamente", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Button(
+            onClick = {
+                scope.launch {
+                    progress.animateTo(0f, tween(220))
+                    onDismiss()
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = CancelButtonBg)
+        ) {
+            Text("Cancelar", color = Color.White, fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun BorderedCard(
+    shape: RoundedCornerShape,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        border = BorderStroke(1.dp, CardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SquareIconButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(IconBadgeBg)
+            .border(1.dp, CardBorder, RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+            Icon(icon, contentDescription = contentDescription, tint = Color.White, modifier = Modifier.size(18.dp))
         }
     }
 }
 
 @Composable
-private fun FormSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
+private fun SectionCard(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+    BorderedCard(shape = RoundedCornerShape(20.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(IconBadgeBg)
+                        .border(1.dp, CardBorder, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = IconBadgeTint, modifier = Modifier.size(16.dp))
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 1.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = SectionTitleColor
+                )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            RowDivider()
+            Spacer(modifier = Modifier.height(4.dp))
             content()
         }
     }
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun RowDivider() {
+    HorizontalDivider(color = DividerColor, thickness = 1.dp)
+}
+
+@Composable
+private fun InfoRow(label: String, trailing: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.6f)
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White
-        )
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = LabelGray)
+        trailing()
     }
 }
 
-private fun transactionTypeLabel(type: String): String = when (type) {
-    "withdrawal" -> "Gasto"
-    "deposit" -> "Ingreso"
-    "transfer" -> "Transferencia"
-    else -> type.replaceFirstChar { it.uppercase() }
+@Composable
+private fun InfoRowPlain(label: String, value: String, subvalue: String? = null) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = LabelGray)
+        Column(horizontalAlignment = Alignment.End) {
+            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            if (!subvalue.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(subvalue, style = MaterialTheme.typography.labelSmall, color = SubLabelGray)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypeBadge(type: String) {
+    val (label, color, icon) = when (type) {
+        "withdrawal" -> Triple("Gasto", WithdrawalColor, Icons.Filled.ArrowDownward)
+        "deposit" -> Triple("Ingreso", DepositColor, Icons.Filled.ArrowUpward)
+        else -> Triple("Transferencia", TransferColor, Icons.Filled.SwapHoriz)
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun Pill(text: String, color: Color) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = color,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.16f))
+            .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
+}
+
+@Composable
+private fun AccountRow(label: String, name: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.02f))
+            .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(IconBadgeBg)
+                .border(1.dp, CardBorder, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.AttachMoney,
+                contentDescription = null,
+                tint = IconBadgeTint,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.5.sp),
+                color = SubLabelGray
+            )
+            Text(
+                name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+
+private fun formatAmountSimple(amount: String, currencySymbol: String?): String {
+    val clean = amount.trimStart('-')
+    val number = clean.toDoubleOrNull()
+    val formatted = if (number != null) String.format(Locale.getDefault(), "%,.2f", number) else clean
+    return "${currencySymbol ?: ""}$formatted"
+}
+
+private fun formatDate(isoDate: String): String {
+    return try {
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
+        val formatter = SimpleDateFormat("d 'de' MMMM, yyyy", Locale("es", "MX"))
+        val parsed = parser.parse(isoDate)
+        if (parsed != null) formatter.format(parsed) else isoDate.take(10)
+    } catch (_: Exception) {
+        isoDate.take(10)
+    }
+}
+
+private fun formatTime(isoDate: String): String {
+    return try {
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
+        val formatter = SimpleDateFormat("HH:mm 'hrs'", Locale.getDefault())
+        val parsed = parser.parse(isoDate)
+        if (parsed != null) formatter.format(parsed) else ""
+    } catch (_: Exception) {
+        ""
+    }
 }
