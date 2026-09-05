@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 sealed class SaveState {
     data object Idle : SaveState()
     data object Saving : SaveState()
-    data object Success : SaveState()
+    data class Success(val groupId: String, val journalId: String?) : SaveState()
     data class Error(val message: String) : SaveState()
 }
 
@@ -69,7 +69,11 @@ class NewTransactionViewModel(
             )
 
             repository.createTransaction(request)
-                .onSuccess { _saveState.value = SaveState.Success }
+                .onSuccess { response ->
+                    val groupId = response.data.id
+                    val journalId = response.data.attributes.transactions.firstOrNull()?.journalId
+                    _saveState.value = SaveState.Success(groupId, journalId)
+                }
                 .onFailure { _saveState.value = SaveState.Error(it.message ?: "Error al guardar") }
         }
     }

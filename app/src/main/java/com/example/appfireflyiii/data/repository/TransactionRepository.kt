@@ -2,6 +2,7 @@ package com.example.appfireflyiii.data.repository
 
 import com.example.appfireflyiii.data.model.TransactionGroup
 import com.example.appfireflyiii.data.model.TransactionStoreRequest
+import com.example.appfireflyiii.data.model.TransactionStoreResponse
 import com.example.appfireflyiii.data.model.TransactionUpdateRequest
 import com.example.appfireflyiii.data.network.FireflyApi
 
@@ -25,10 +26,10 @@ class TransactionRepository(private val api: FireflyApi) {
         }
     }
 
-    suspend fun createTransaction(request: TransactionStoreRequest): Result<Unit> {
+    suspend fun createTransaction(request: TransactionStoreRequest): Result<TransactionStoreResponse> {
         return try {
-            api.createTransaction(request)
-            Result.success(Unit)
+            val response = api.createTransaction(request)
+            Result.success(response)
         } catch (e: Exception) {
             Result.failure(e)
         }

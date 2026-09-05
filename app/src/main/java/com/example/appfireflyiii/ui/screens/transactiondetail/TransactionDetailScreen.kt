@@ -64,6 +64,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.example.appfireflyiii.data.repository.CategoryRepository
+import com.example.appfireflyiii.data.repository.TagRepository
+
 
 @Composable
 fun TransactionDetailScreen(
@@ -71,7 +73,8 @@ fun TransactionDetailScreen(
     viewModel: TransactionDetailViewModel,
     accountRepository: AccountRepository,
     budgetRepository: BudgetRepository,
-    categoryRepository: CategoryRepository
+    categoryRepository: CategoryRepository,
+    tagRepository: TagRepository
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
@@ -168,6 +171,7 @@ fun TransactionDetailScreen(
                                 accountRepository = accountRepository,
                                 budgetRepository = budgetRepository,
                                 categoryRepository = categoryRepository,
+                                tagRepository = tagRepository,
                                 onSave = { type, date, amount, description, sourceId, destinationName, sourceName,
                                            destinationId, categoryName, budgetName, notes, tags, foreignAmount,
                                            foreignCurrencyCode, applyRules, fireWebhooks ->
@@ -190,7 +194,9 @@ fun TransactionDetailScreen(
                                         fireWebhooks = fireWebhooks
                                     )
                                 },
-                                onSavedNavigateBack = { isEditing = false }
+                                onSavedNavigateBack = { isEditing = false },
+                                onViewDetails = { _, _ -> isEditing = false },
+                                onConsumeSuccess = { viewModel.resetSaveState() }
                             )
                         } else {
                             TransactionDetailContent(

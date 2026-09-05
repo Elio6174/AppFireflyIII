@@ -126,7 +126,8 @@ fun FireflyApp(activity: FragmentActivity) {
                     reportsViewModelFactory = reportsViewModelFactory,
                     accountRepository = accountRepository,
                     budgetRepository = budgetRepository,
-                    categoryRepository = categoryRepository
+                    categoryRepository = categoryRepository,
+                    tagRepository = tagRepository
                 )
             }
 
@@ -197,7 +198,7 @@ fun FireflyApp(activity: FragmentActivity) {
                     TransactionDetailViewModelFactory(transactionRepository, groupId, journalId)
                 }
                 val viewModel: TransactionDetailViewModel = viewModel(key = "$groupId/$journalId", factory = factory)
-                TransactionDetailScreen(navController, viewModel, accountRepository, budgetRepository, categoryRepository)
+                TransactionDetailScreen(navController, viewModel, accountRepository, budgetRepository, categoryRepository, tagRepository)
             }
             composable(Screen.CreateAccount.route) {
                 val factory = remember { CreateAccountViewModelFactory(accountRepository) }

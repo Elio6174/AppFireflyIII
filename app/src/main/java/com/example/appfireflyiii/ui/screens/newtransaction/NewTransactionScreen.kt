@@ -7,6 +7,8 @@ import androidx.navigation.NavController
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.BudgetRepository
 import com.example.appfireflyiii.data.repository.CategoryRepository
+import com.example.appfireflyiii.data.repository.TagRepository
+import com.example.appfireflyiii.navigation.Screen
 
 @Composable
 fun NewTransactionScreen(
@@ -14,7 +16,8 @@ fun NewTransactionScreen(
     viewModel: NewTransactionViewModel,
     accountRepository: AccountRepository,
     budgetRepository: BudgetRepository,
-    categoryRepository: CategoryRepository
+    categoryRepository: CategoryRepository,
+    tagRepository: TagRepository
 ) {
     val saveState by viewModel.saveState.collectAsState()
 
@@ -26,6 +29,7 @@ fun NewTransactionScreen(
         accountRepository = accountRepository,
         budgetRepository = budgetRepository,
         categoryRepository = categoryRepository,
+        tagRepository = tagRepository,
         onSave = { type, date, amount, description, sourceId, destinationName, sourceName, destinationId,
                    categoryName, budgetName, notes, tags, foreignAmount, foreignCurrencyCode, applyRules, fireWebhooks ->
             viewModel.save(
@@ -47,6 +51,10 @@ fun NewTransactionScreen(
                 fireWebhooks = fireWebhooks
             )
         },
-        onSavedNavigateBack = { navController.popBackStack() }
+        onSavedNavigateBack = { navController.popBackStack() },
+        onViewDetails = { groupId, journalId ->
+            navController.navigate(Screen.TransactionDetail.createRoute(groupId, journalId))
+        },
+        onConsumeSuccess = { viewModel.resetState() }
     )
 }

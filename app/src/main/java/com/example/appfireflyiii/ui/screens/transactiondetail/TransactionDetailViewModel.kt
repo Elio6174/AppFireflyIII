@@ -103,8 +103,8 @@ class TransactionDetailViewModel(
             )
             repository.updateTransaction(groupId, request)
                 .onSuccess {
-                    _saveState.value = SaveState.Success
-                    load() // refresca los datos mostrados con lo recién guardado
+                    _saveState.value = SaveState.Success(groupId, journalId)
+                    load()
                 }
                 .onFailure { _saveState.value = SaveState.Error(it.message ?: "Error al guardar") }
         }
@@ -117,6 +117,10 @@ class TransactionDetailViewModel(
                 .onSuccess { _uiState.value = TransactionDetailUiState.Deleted }
                 .onFailure { _uiState.value = TransactionDetailUiState.Error(it.message ?: "Error al eliminar") }
         }
+    }
+
+    fun resetSaveState() {
+        _saveState.value = SaveState.Idle
     }
 }
 

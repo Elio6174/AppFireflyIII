@@ -28,13 +28,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +55,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import com.example.appfireflyiii.data.model.CategoryData
 import com.example.appfireflyiii.data.repository.CategoryRepository
+import com.example.appfireflyiii.data.repository.TagRepository
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 
 import com.example.appfireflyiii.ui.theme.DetailScreenBg as ScreenBg
 import com.example.appfireflyiii.ui.theme.DetailCardBg as CardBg
@@ -90,6 +102,16 @@ data class TransactionFormInitialValues(
     val minute: Int? = null
 )
 
+private data class TransactionSuccessInfo(
+    val amount: String,
+    val accountLabel: String,
+    val accountName: String?,
+    val categoryName: String?,
+    val type: String,
+    val groupId: String,
+    val journalId: String?
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionFormBody(
@@ -100,6 +122,7 @@ fun TransactionFormBody(
     accountRepository: AccountRepository,
     budgetRepository: BudgetRepository,
     categoryRepository: CategoryRepository,
+    tagRepository: TagRepository,
     allowTypeChange: Boolean = true,
     onSave: (
         type: String,
@@ -119,7 +142,9 @@ fun TransactionFormBody(
         applyRules: Boolean,
         fireWebhooks: Boolean
     ) -> Unit,
-    onSavedNavigateBack: () -> Unit
+    onSavedNavigateBack: () -> Unit,
+    onViewDetails: (groupId: String, journalId: String) -> Unit = { _, _ -> },
+    onConsumeSuccess: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -130,6 +155,7 @@ fun TransactionFormBody(
     var categories by remember { mutableStateOf<List<CategoryData>>(emptyList()) }
     var selectedCategory by remember { mutableStateOf<CategoryData?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var allTags by remember { mutableStateOf<List<String>>(emptyList()) }
     var notes by remember { mutableStateOf(initialValues.notes) }
     var tags by remember {
         mutableStateOf(
@@ -145,7 +171,11 @@ fun TransactionFormBody(
     var resetFormAfterSubmit by remember { mutableStateOf(false) }
 
     var foreignSectionExpanded by remember { mutableStateOf(false) }
-    var shippingSectionExpanded by remember { mutableStateOf(true) }
+    var shippingSectionExpanded by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var showSuccessSheet by remember { mutableStateOf(false) }
+    val successSheetProgress = remember { Animatable(0f) }
+    var successInfo by remember { mutableStateOf<TransactionSuccessInfo?>(null) }
 
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
@@ -207,29 +237,48 @@ fun TransactionFormBody(
             categories = loaded
             selectedCategory = loaded.find { it.attributes.name == initialValues.category }
         }
+
+        tagRepository.getTags().onSuccess { loaded ->
+            allTags = loaded.map { it.attributes.tag }
+        }
     }
 
     LaunchedEffect(saveState) {
-        if (saveState is SaveState.Success) {
-            if (resetFormAfterSubmit) {
-                amount = ""
-                description = ""
-                otherParty = ""
-                otherPartyAccount = null
-                category = ""
-                notes = ""
-                tags = emptyList()
-                foreignAmount = ""
-                foreignCurrency = ""
-                selectedBudget = null
-                selectedCategory = null
-                selectedDateMillis = null
-                selectedHour = null
-                selectedMinute = null
+        val success = saveState as? SaveState.Success
+        if (success != null) {
+            val accountLabel = if (transactionType == "deposit") "Cuenta destino" else "Cuenta origen"
+            val accountName = when (transactionType) {
+                "deposit" -> selectedDestinationAccount?.attributes?.name
+                else -> selectedSourceAccount?.attributes?.name
             }
-            if (!returnToCreateAnother) {
-                onSavedNavigateBack()
-            }
+            successInfo = TransactionSuccessInfo(
+                amount = amount,
+                accountLabel = accountLabel,
+                accountName = accountName,
+                categoryName = selectedCategory?.attributes?.name,
+                type = transactionType,
+                groupId = success.groupId,
+                journalId = success.journalId
+            )
+
+            amount = ""
+            description = ""
+            otherParty = ""
+            otherPartyAccount = null
+            category = ""
+            notes = ""
+            tags = emptyList()
+            foreignAmount = ""
+            foreignCurrency = ""
+            selectedBudget = null
+            selectedCategory = null
+            selectedDateMillis = null
+            selectedHour = null
+            selectedMinute = null
+
+            showSuccessSheet = true
+            onConsumeSuccess()
+            scope.launch { successSheetProgress.animateTo(1f, tween(280)) }
         }
     }
 
@@ -250,363 +299,471 @@ fun TransactionFormBody(
         else -> "⇄$"
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(ScreenBg)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp)
-        ) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TransactionTypeSelector(
-                selected = transactionType,
-                allowChange = allowTypeChange,
-                onSelect = {
-                    transactionType = it
-                    selectedBudget = null
-                }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            AmountHeroCard(
-                label = amountLabel,
-                prefix = amountPrefix,
-                amount = amount,
-                onAmountChange = { amount = it }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            SectionCard(title = "DETALLES", icon = Icons.Filled.Description) {
-                FieldLabel("DESCRIPCIÓN")
-                Spacer(modifier = Modifier.height(6.dp))
-                SleekTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = "¿En qué gastaste? (Ej. Compras del súper)"
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            SectionCard(title = "CUENTAS", icon = Icons.Filled.CreditCard) {
-                when (transactionType) {
-                    "withdrawal" -> {
-                        FieldLabel("CUENTA ORIGEN")
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AccountSelectRow(
-                            icon = Icons.Filled.AttachMoney,
-                            name = selectedSourceAccount?.attributes?.name ?: "Selecciona una cuenta",
-                            subtitle = selectedSourceAccount?.let {
-                                "Saldo disp: ${formatAmount(it.attributes.currentBalance, it.attributes.currencySymbol)}"
-                            } ?: "Sin asignar",
-                            actionLabel = "Cambiar",
-                            onClick = { showSourcePicker = true }
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        FieldLabel("PAGADO A (OPCIONAL)")
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AccountSelectRow(
-                            icon = Icons.Filled.Person,
-                            name = otherParty.ifBlank { "Beneficiario o comercio" },
-                            subtitle = if (otherParty.isBlank()) "Sin asignar · Opcional" else "Toca para cambiar",
-                            actionLabel = "Elegir",
-                            onClick = { showOtherPartyPicker = true }
-                        )
-                    }
-                    "deposit" -> {
-                        FieldLabel("RECIBIDO DE (OPCIONAL)")
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AccountSelectRow(
-                            icon = Icons.Filled.Person,
-                            name = otherParty.ifBlank { "Pagador o fuente" },
-                            subtitle = if (otherParty.isBlank()) "Sin asignar · Opcional" else "Toca para cambiar",
-                            actionLabel = "Elegir",
-                            onClick = { showOtherPartyPicker = true }
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        FieldLabel("CUENTA DESTINO")
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AccountSelectRow(
-                            icon = Icons.Filled.AttachMoney,
-                            name = selectedDestinationAccount?.attributes?.name ?: "Selecciona una cuenta",
-                            subtitle = selectedDestinationAccount?.let {
-                                "Saldo disp: ${formatAmount(it.attributes.currentBalance, it.attributes.currencySymbol)}"
-                            } ?: "Sin asignar",
-                            actionLabel = "Cambiar",
-                            onClick = { showDestinationPicker = true }
-                        )
-                    }
-                    else -> {
-                        FieldLabel("CUENTA ORIGEN")
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AccountSelectRow(
-                            icon = Icons.Filled.AttachMoney,
-                            name = selectedSourceAccount?.attributes?.name ?: "Selecciona una cuenta",
-                            subtitle = selectedSourceAccount?.let {
-                                "Saldo disp: ${formatAmount(it.attributes.currentBalance, it.attributes.currencySymbol)}"
-                            } ?: "Sin asignar",
-                            actionLabel = "Cambiar",
-                            onClick = { showSourcePicker = true }
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        FieldLabel("CUENTA DESTINO")
-                        Spacer(modifier = Modifier.height(6.dp))
-                        AccountSelectRow(
-                            icon = Icons.Filled.AttachMoney,
-                            name = selectedDestinationAccount?.attributes?.name ?: "Selecciona una cuenta",
-                            subtitle = selectedDestinationAccount?.let {
-                                "Saldo disp: ${formatAmount(it.attributes.currentBalance, it.attributes.currencySymbol)}"
-                            } ?: "Sin asignar",
-                            actionLabel = "Cambiar",
-                            onClick = { showDestinationPicker = true }
-                        )
-
-                        if (selectedSourceAccount != null &&
-                            selectedSourceAccount?.id == selectedDestinationAccount?.id
-                        ) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "El origen y el destino no pueden ser la misma cuenta",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = WithdrawalColor
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            CollapsibleRowCard(
-                title = "Cantidad extranjera",
-                subtitle = "Conversor y comisiones de cambio",
-                icon = Icons.Filled.Public,
-                expanded = foreignSectionExpanded,
-                onToggle = { foreignSectionExpanded = !foreignSectionExpanded }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().background(ScreenBg)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState, enabled = !showSuccessSheet)
+                    .padding(horizontal = 20.dp)
             ) {
-                SleekTextField(
-                    value = foreignAmount,
-                    onValueChange = { foreignAmount = it },
-                    label = "Cantidad extranjera (opcional)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                SleekTextField(
-                    value = foreignCurrency,
-                    onValueChange = { foreignCurrency = it.uppercase() },
-                    label = "Moneda (ej. USD)"
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            SectionCard(title = "FECHA Y HORA", icon = Icons.Filled.CalendarMonth) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DateTimeBox(
-                        modifier = Modifier.weight(1f),
-                        label = "FECHA",
-                        value = displayDate,
-                        onClick = { showDatePicker = true }
-                    )
-                    DateTimeBox(
-                        modifier = Modifier.weight(1f),
-                        label = "HORA",
-                        value = displayTime,
-                        onClick = { showTimePicker = true }
-                    )
-                }
-                if (selectedDateMillis != null || selectedHour != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        "Toca para restablecer a la fecha/hora actual",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TransferColor,
-                        modifier = Modifier.clickable {
-                            selectedDateMillis = null
-                            selectedHour = null
-                            selectedMinute = null
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            SectionCard(title = "CLASIFICACIÓN", icon = Icons.Filled.Category) {
-                FieldLabel("CATEGORÍA")
-                Spacer(modifier = Modifier.height(6.dp))
-                BudgetSelectRow(
-                    name = selectedCategory?.attributes?.name ?: "(ninguna)",
-                    isSelected = selectedCategory != null,
-                    onClick = { showCategoryPicker = true }
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
 
-                if (transactionType == "withdrawal" && budgets.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    FieldLabel("PRESUPUESTO")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TransactionTypeSelector(
+                    selected = transactionType,
+                    allowChange = allowTypeChange,
+                    onSelect = {
+                        transactionType = it
+                        selectedBudget = null
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                AmountHeroCard(
+                    label = amountLabel,
+                    prefix = amountPrefix,
+                    amount = amount,
+                    onAmountChange = { amount = it }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SectionCard(title = "DETALLES", icon = Icons.Filled.Description) {
+                    FieldLabel("DESCRIPCIÓN")
                     Spacer(modifier = Modifier.height(6.dp))
-                    BudgetSelectRow(
-                        name = selectedBudget?.attributes?.name ?: "(ninguna)",
-                        isSelected = selectedBudget != null,
-                        onClick = { showBudgetPicker = true }
+                    SleekTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = "¿En qué gastaste? (Ej. Compras del súper)"
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                FieldLabel("ETIQUETAS")
-                Spacer(modifier = Modifier.height(6.dp))
-                TagsEditor(
-                    tags = tags,
-                    onRemoveTag = { tag -> tags = tags - tag },
-                    showAddField = showAddTagField,
-                    newTagText = newTagText,
-                    onNewTagTextChange = { newTagText = it },
-                    onStartAdd = { showAddTagField = true },
-                    onCommitAdd = {
-                        val cleaned = newTagText.trim()
-                        if (cleaned.isNotBlank() && !tags.contains(cleaned)) {
-                            tags = tags + cleaned
-                        }
-                        newTagText = ""
-                        showAddTagField = false
-                    }
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                FieldLabel("NOTAS ADICIONALES")
-                Spacer(modifier = Modifier.height(6.dp))
-                SleekTextField(value = notes, onValueChange = { notes = it }, label = "Notas, ticket o detalles adicionales...", minLines = 3)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            CollapsibleRowCard(
-                title = "Opciones de envío",
-                subtitle = null,
-                icon = Icons.Filled.Send,
-                expanded = shippingSectionExpanded,
-                onToggle = { shippingSectionExpanded = !shippingSectionExpanded }
-            ) {
-                SleekCheckRow(
-                    label = "Después de guardar, volver aquí para crear otro",
-                    checked = returnToCreateAnother,
-                    onCheckedChange = { returnToCreateAnother = it },
-                    accentWhenUnchecked = TagAmber
-                )
-                SleekCheckRow(
-                    label = "Restablecer formulario después del envío",
-                    checked = resetFormAfterSubmit,
-                    onCheckedChange = { resetFormAfterSubmit = it },
-                    accentWhenUnchecked = TagAmber
-                )
-                RowDivider()
-                SleekCheckRow(
-                    label = "Aplicar reglas",
-                    checked = applyRules,
-                    onCheckedChange = { applyRules = it }
-                )
-                SleekCheckRow(
-                    label = "Disparar webhooks",
-                    checked = fireWebhooks,
-                    onCheckedChange = { fireWebhooks = it }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            when (saveState) {
-                is SaveState.Error -> {
-                    Text(saveState.message, color = WithdrawalColor)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                is SaveState.Success -> {
-                    Text("¡Guardado!", color = DepositColor)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                else -> {}
-            }
-
-            val canSubmit = amount.isNotBlank() && description.isNotBlank() && when (transactionType) {
-                "withdrawal" -> selectedSourceAccount != null
-                "deposit" -> selectedDestinationAccount != null
-                else -> selectedSourceAccount != null &&
-                        selectedDestinationAccount != null &&
-                        selectedSourceAccount?.id != selectedDestinationAccount?.id
-            }
-
-            Button(
-                onClick = {
-                    val now = Calendar.getInstance()
-                    val cal = Calendar.getInstance().apply {
-                        timeInMillis = selectedDateMillis ?: now.timeInMillis
-                        set(Calendar.HOUR_OF_DAY, selectedHour ?: now.get(Calendar.HOUR_OF_DAY))
-                        set(Calendar.MINUTE, selectedMinute ?: now.get(Calendar.MINUTE))
-                    }
-                    val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                    val dateStr = isoFormat.format(cal.time)
-
-                    if (amount.isBlank() || description.isBlank()) return@Button
-
+                SectionCard(title = "CUENTAS", icon = Icons.Filled.CreditCard) {
                     when (transactionType) {
                         "withdrawal" -> {
-                            val source = selectedSourceAccount ?: return@Button
-                            onSave(
-                                "withdrawal", dateStr, amount, description, source.id,
-                                if (otherPartyAccount == null) otherParty.ifBlank { null } else null,
-                                null, otherPartyAccount?.id, category,
-                                selectedBudget?.attributes?.name, notes, tags,
-                                foreignAmount, foreignCurrency, applyRules, fireWebhooks
+                            FieldLabel("CUENTA ORIGEN")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AccountSelectRow(
+                                icon = Icons.Filled.AttachMoney,
+                                name = selectedSourceAccount?.attributes?.name
+                                    ?: "Selecciona una cuenta",
+                                subtitle = selectedSourceAccount?.let {
+                                    "Saldo disp: ${
+                                        formatAmount(
+                                            it.attributes.currentBalance,
+                                            it.attributes.currencySymbol
+                                        )
+                                    }"
+                                } ?: "Sin asignar",
+                                actionLabel = "Cambiar",
+                                onClick = { showSourcePicker = true }
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            FieldLabel("PAGADO A (OPCIONAL)")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AccountSelectRow(
+                                icon = Icons.Filled.Person,
+                                name = otherParty.ifBlank { "Beneficiario o comercio" },
+                                subtitle = if (otherParty.isBlank()) "Sin asignar · Opcional" else "Toca para cambiar",
+                                actionLabel = "Elegir",
+                                onClick = { showOtherPartyPicker = true }
                             )
                         }
+
                         "deposit" -> {
-                            val destination = selectedDestinationAccount ?: return@Button
-                            onSave(
-                                "deposit", dateStr, amount, description, otherPartyAccount?.id, null,
-                                if (otherPartyAccount == null) otherParty.ifBlank { null } else null,
-                                destination.id, category, null, notes, tags,
-                                foreignAmount, foreignCurrency, applyRules, fireWebhooks
+                            FieldLabel("RECIBIDO DE (OPCIONAL)")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AccountSelectRow(
+                                icon = Icons.Filled.Person,
+                                name = otherParty.ifBlank { "Pagador o fuente" },
+                                subtitle = if (otherParty.isBlank()) "Sin asignar · Opcional" else "Toca para cambiar",
+                                actionLabel = "Elegir",
+                                onClick = { showOtherPartyPicker = true }
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            FieldLabel("CUENTA DESTINO")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AccountSelectRow(
+                                icon = Icons.Filled.AttachMoney,
+                                name = selectedDestinationAccount?.attributes?.name
+                                    ?: "Selecciona una cuenta",
+                                subtitle = selectedDestinationAccount?.let {
+                                    "Saldo disp: ${
+                                        formatAmount(
+                                            it.attributes.currentBalance,
+                                            it.attributes.currencySymbol
+                                        )
+                                    }"
+                                } ?: "Sin asignar",
+                                actionLabel = "Cambiar",
+                                onClick = { showDestinationPicker = true }
                             )
                         }
+
                         else -> {
-                            val source = selectedSourceAccount ?: return@Button
-                            val destination = selectedDestinationAccount ?: return@Button
-                            if (source.id == destination.id) return@Button
-                            onSave(
-                                "transfer", dateStr, amount, description, source.id, null, null,
-                                destination.id, category, null, notes, tags,
-                                foreignAmount, foreignCurrency, applyRules, fireWebhooks
+                            FieldLabel("CUENTA ORIGEN")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AccountSelectRow(
+                                icon = Icons.Filled.AttachMoney,
+                                name = selectedSourceAccount?.attributes?.name
+                                    ?: "Selecciona una cuenta",
+                                subtitle = selectedSourceAccount?.let {
+                                    "Saldo disp: ${
+                                        formatAmount(
+                                            it.attributes.currentBalance,
+                                            it.attributes.currencySymbol
+                                        )
+                                    }"
+                                } ?: "Sin asignar",
+                                actionLabel = "Cambiar",
+                                onClick = { showSourcePicker = true }
                             )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            FieldLabel("CUENTA DESTINO")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            AccountSelectRow(
+                                icon = Icons.Filled.AttachMoney,
+                                name = selectedDestinationAccount?.attributes?.name
+                                    ?: "Selecciona una cuenta",
+                                subtitle = selectedDestinationAccount?.let {
+                                    "Saldo disp: ${
+                                        formatAmount(
+                                            it.attributes.currentBalance,
+                                            it.attributes.currencySymbol
+                                        )
+                                    }"
+                                } ?: "Sin asignar",
+                                actionLabel = "Cambiar",
+                                onClick = { showDestinationPicker = true }
+                            )
+
+                            if (selectedSourceAccount != null &&
+                                selectedSourceAccount?.id == selectedDestinationAccount?.id
+                            ) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "El origen y el destino no pueden ser la misma cuenta",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = WithdrawalColor
+                                )
+                            }
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(27.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, disabledContainerColor = Color.White.copy(alpha = 0.3f)),
-                enabled = saveState != SaveState.Saving && canSubmit
-            ) {
-                if (saveState == SaveState.Saving) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black)
-                } else {
-                    Icon(Icons.Filled.Save, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Black)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(submitLabel, fontWeight = FontWeight.SemiBold, color = Color.Black)
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                CollapsibleRowCard(
+                    title = "Cantidad extranjera",
+                    subtitle = "Conversor y comisiones de cambio",
+                    icon = Icons.Filled.Public,
+                    expanded = foreignSectionExpanded,
+                    onToggle = { foreignSectionExpanded = !foreignSectionExpanded }
+                ) {
+                    SleekTextField(
+                        value = foreignAmount,
+                        onValueChange = { foreignAmount = it },
+                        label = "Cantidad extranjera (opcional)",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    SleekTextField(
+                        value = foreignCurrency,
+                        onValueChange = { foreignCurrency = it.uppercase() },
+                        label = "Moneda (ej. USD)"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SectionCard(title = "FECHA Y HORA", icon = Icons.Filled.CalendarMonth) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        DateTimeBox(
+                            modifier = Modifier.weight(1f),
+                            label = "FECHA",
+                            value = displayDate,
+                            onClick = { showDatePicker = true }
+                        )
+                        DateTimeBox(
+                            modifier = Modifier.weight(1f),
+                            label = "HORA",
+                            value = displayTime,
+                            onClick = { showTimePicker = true }
+                        )
+                    }
+                    if (selectedDateMillis != null || selectedHour != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            "Toca para restablecer a la fecha/hora actual",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TransferColor,
+                            modifier = Modifier.clickable {
+                                selectedDateMillis = null
+                                selectedHour = null
+                                selectedMinute = null
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SectionCard(title = "CLASIFICACIÓN", icon = Icons.Filled.Category) {
+                    FieldLabel("CATEGORÍA")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    BudgetSelectRow(
+                        name = selectedCategory?.attributes?.name ?: "(ninguna)",
+                        isSelected = selectedCategory != null,
+                        onClick = { showCategoryPicker = true }
+                    )
+
+                    if (transactionType == "withdrawal" && budgets.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        FieldLabel("PRESUPUESTO")
+                        Spacer(modifier = Modifier.height(6.dp))
+                        BudgetSelectRow(
+                            name = selectedBudget?.attributes?.name ?: "(ninguna)",
+                            isSelected = selectedBudget != null,
+                            onClick = { showBudgetPicker = true }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    FieldLabel("ETIQUETAS")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    TagsEditor(
+                        tags = tags,
+                        allTags = allTags,
+                        onRemoveTag = { tag -> tags = tags - tag },
+                        showAddField = showAddTagField,
+                        newTagText = newTagText,
+                        onNewTagTextChange = { newTagText = it },
+                        onStartAdd = { showAddTagField = true },
+                        onCommitAdd = { chosen ->
+                            val cleaned = chosen.trim()
+                            if (cleaned.isNotBlank() && !tags.contains(cleaned)) {
+                                tags = tags + cleaned
+                            }
+                            newTagText = ""
+                            showAddTagField = false
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    FieldLabel("NOTAS ADICIONALES")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SleekTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = "Notas, ticket o detalles adicionales...",
+                        minLines = 3
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                CollapsibleRowCard(
+                    title = "Opciones de envío",
+                    subtitle = null,
+                    icon = Icons.Filled.Send,
+                    expanded = shippingSectionExpanded,
+                    onToggle = { shippingSectionExpanded = !shippingSectionExpanded }
+                ) {
+                    SleekCheckRow(
+                        label = "Después de guardar, volver aquí para crear otro",
+                        checked = returnToCreateAnother,
+                        onCheckedChange = { returnToCreateAnother = it },
+                        accentWhenUnchecked = SubLabelGray
+                    )
+                    SleekCheckRow(
+                        label = "Restablecer formulario después del envío",
+                        checked = resetFormAfterSubmit,
+                        onCheckedChange = { resetFormAfterSubmit = it },
+                        accentWhenUnchecked = SubLabelGray
+                    )
+                    RowDivider()
+                    SleekCheckRow(
+                        label = "Aplicar reglas",
+                        checked = applyRules,
+                        onCheckedChange = { applyRules = it }
+                    )
+                    SleekCheckRow(
+                        label = "Disparar webhooks",
+                        checked = fireWebhooks,
+                        onCheckedChange = { fireWebhooks = it }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                when (saveState) {
+                    is SaveState.Error -> {
+                        Text(saveState.message, color = WithdrawalColor)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    else -> {}
+                }
+
+                val canSubmit =
+                    amount.isNotBlank() && description.isNotBlank() && when (transactionType) {
+                        "withdrawal" -> selectedSourceAccount != null
+                        "deposit" -> selectedDestinationAccount != null
+                        else -> selectedSourceAccount != null &&
+                                selectedDestinationAccount != null &&
+                                selectedSourceAccount?.id != selectedDestinationAccount?.id
+                    }
+
+                Button(
+                    onClick = {
+                        val now = Calendar.getInstance()
+                        val cal = Calendar.getInstance().apply {
+                            timeInMillis = selectedDateMillis ?: now.timeInMillis
+                            set(Calendar.HOUR_OF_DAY, selectedHour ?: now.get(Calendar.HOUR_OF_DAY))
+                            set(Calendar.MINUTE, selectedMinute ?: now.get(Calendar.MINUTE))
+                        }
+                        val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                        val dateStr = isoFormat.format(cal.time)
+
+                        if (amount.isBlank() || description.isBlank()) return@Button
+
+                        when (transactionType) {
+                            "withdrawal" -> {
+                                val source = selectedSourceAccount ?: return@Button
+                                onSave(
+                                    "withdrawal", dateStr, amount, description, source.id,
+                                    if (otherPartyAccount == null) otherParty.ifBlank { null } else null,
+                                    null, otherPartyAccount?.id, selectedCategory?.attributes?.name,
+                                    selectedBudget?.attributes?.name, notes, tags,
+                                    foreignAmount, foreignCurrency, applyRules, fireWebhooks
+                                )
+                            }
+
+                            "deposit" -> {
+                                val destination = selectedDestinationAccount ?: return@Button
+                                onSave(
+                                    "deposit",
+                                    dateStr,
+                                    amount,
+                                    description,
+                                    otherPartyAccount?.id,
+                                    null,
+                                    if (otherPartyAccount == null) otherParty.ifBlank { null } else null,
+                                    destination.id,
+                                    selectedCategory?.attributes?.name,
+                                    null,
+                                    notes,
+                                    tags,
+                                    foreignAmount,
+                                    foreignCurrency,
+                                    applyRules,
+                                    fireWebhooks
+                                )
+                            }
+
+                            else -> {
+                                val source = selectedSourceAccount ?: return@Button
+                                val destination = selectedDestinationAccount ?: return@Button
+                                if (source.id == destination.id) return@Button
+                                onSave(
+                                    "transfer",
+                                    dateStr,
+                                    amount,
+                                    description,
+                                    source.id,
+                                    null,
+                                    null,
+                                    destination.id,
+                                    selectedCategory?.attributes?.name,
+                                    null,
+                                    notes,
+                                    tags,
+                                    foreignAmount,
+                                    foreignCurrency,
+                                    applyRules,
+                                    fireWebhooks
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(27.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        disabledContainerColor = Color.White.copy(alpha = 0.3f)
+                    ),
+                    enabled = saveState != SaveState.Saving && canSubmit
+                ) {
+                    if (saveState == SaveState.Saving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.Black
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(submitLabel, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
+        if (showSuccessSheet) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f * successSheetProgress.value))
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {})
+                    }
+            )
+            successInfo?.let { info ->
+                SuccessConfirmationSheet(
+                    info = info,
+                    progress = successSheetProgress,
+                    onAccept = {
+                        scope.launch {
+                            successSheetProgress.animateTo(0f, tween(220))
+                            showSuccessSheet = false
+                            scrollState.animateScrollTo(0, tween(400))
+                            if (!returnToCreateAnother) {
+                                onSavedNavigateBack()
+                            }
+                        }
+                    },
+                    onDetails = {
+                        scope.launch {
+                            successSheetProgress.animateTo(0f, tween(220))
+                            showSuccessSheet = false
+                            scrollState.animateScrollTo(0, tween(400))
+                            if (info.journalId != null) {
+                                onViewDetails(info.groupId, info.journalId)
+                            }
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -885,6 +1042,9 @@ private fun AmountHeroCard(label: String, prefix: String, amount: String, onAmou
 
 @Composable
 private fun BasicAmountField(amount: String, onAmountChange: (String) -> Unit) {
+    val currentAmount = androidx.compose.runtime.rememberUpdatedState(amount)
+    val currentOnAmountChange = androidx.compose.runtime.rememberUpdatedState(onAmountChange)
+
     BasicTextField(
         value = amount,
         onValueChange = onAmountChange,
@@ -897,11 +1057,58 @@ private fun BasicAmountField(amount: String, onAmountChange: (String) -> Unit) {
         ),
         cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        modifier = Modifier.defaultMinSize(minWidth = 110.dp),
+        modifier = Modifier
+            .defaultMinSize(minWidth = 110.dp)
+            .pointerInput(Unit) {
+                val dragThresholdPx = 8.dp.toPx()
+                val pxPerUnit = 10.dp.toPx()
+
+                awaitEachGesture {
+                    val down = awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial
+                    )
+                    var isDragging = false
+                    var totalDrag = 0f
+                    var pixelsSinceLastStep = 0f
+
+                    while (true) {
+                        val event = awaitPointerEvent(
+                            pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial
+                        )
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (change.changedToUpIgnoreConsumed()) break
+
+                        val deltaX = change.positionChange().x
+                        totalDrag += deltaX
+
+                        if (!isDragging && kotlin.math.abs(totalDrag) > dragThresholdPx) {
+                            isDragging = true
+                        }
+
+                        if (isDragging) {
+                            change.consume()
+                            pixelsSinceLastStep += deltaX
+                            while (kotlin.math.abs(pixelsSinceLastStep) >= pxPerUnit) {
+                                val currentInt = (currentAmount.value.toDoubleOrNull() ?: 0.0).toLong()
+                                if (pixelsSinceLastStep > 0) {
+                                    pixelsSinceLastStep -= pxPerUnit
+                                    val next = (currentInt - 1).coerceAtLeast(0L)
+                                    currentOnAmountChange.value(formatDragAmount(next))
+                                } else {
+                                    pixelsSinceLastStep += pxPerUnit
+                                    val next = currentInt + 1
+                                    currentOnAmountChange.value(formatDragAmount(next))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
         decorationBox = { innerTextField ->
             Box(
-                modifier = Modifier.fillMaxWidth(),   // <- ocupa todo el ancho disponible
-                contentAlignment = Alignment.Center   // <- centra el contenido (texto o placeholder)
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
                 if (amount.isEmpty()) {
                     Text(
@@ -920,6 +1127,10 @@ private fun BasicAmountField(amount: String, onAmountChange: (String) -> Unit) {
             }
         }
     )
+}
+
+private fun formatDragAmount(value: Long): String {
+    return String.format(Locale.US, "%.2f", value.toDouble())
 }
 
 @Composable
@@ -1034,62 +1245,99 @@ private fun CategoryField(value: String, onValueChange: (String) -> Unit) {
 @Composable
 private fun TagsEditor(
     tags: List<String>,
+    allTags: List<String>,
     onRemoveTag: (String) -> Unit,
     showAddField: Boolean,
     newTagText: String,
     onNewTagTextChange: (String) -> Unit,
     onStartAdd: () -> Unit,
-    onCommitAdd: () -> Unit
+    onCommitAdd: (String) -> Unit
 ) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        tags.forEach { tag ->
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(TagAmber.copy(alpha = 0.16f))
-                    .border(1.dp, TagAmber.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                    .clickable { onRemoveTag(tag) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("#$tag", style = MaterialTheme.typography.labelMedium, color = TagAmber, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(Icons.Filled.Close, contentDescription = "Quitar", tint = TagAmber, modifier = Modifier.size(12.dp))
+    val suggestions = remember(newTagText, allTags, tags) {
+        if (newTagText.isBlank()) emptyList()
+        else allTags.filter {
+            it.contains(newTagText, ignoreCase = true) && !tags.contains(it)
+        }.take(5)
+    }
+
+    Column {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            tags.forEach { tag ->
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(TagAmber.copy(alpha = 0.16f))
+                        .border(1.dp, TagAmber.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                        .clickable { onRemoveTag(tag) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("#$tag", style = MaterialTheme.typography.labelMedium, color = TagAmber, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Filled.Close, contentDescription = "Quitar", tint = TagAmber, modifier = Modifier.size(12.dp))
+                }
+            }
+
+            if (showAddField) {
+                TextField(
+                    value = newTagText,
+                    onValueChange = onNewTagTextChange,
+                    placeholder = { Text("nueva etiqueta", color = SubLabelGray) },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
+                    modifier = Modifier.width(140.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = CardBg,
+                        unfocusedContainerColor = CardBg,
+                        focusedIndicatorColor = TagAmber,
+                        unfocusedIndicatorColor = CardBorder
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onDone = { if (newTagText.isNotBlank()) onCommitAdd(newTagText) }
+                    ),
+                    trailingIcon = {
+                        IconButton(onClick = { if (newTagText.isNotBlank()) onCommitAdd(newTagText) }) {
+                            Icon(Icons.Filled.Check, contentDescription = "Agregar", tint = TagAmber)
+                        }
+                    }
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                        .clickable { onStartAdd() }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("+ Añadir etiqueta", style = MaterialTheme.typography.labelMedium, color = SubLabelGray)
+                }
             }
         }
 
-        if (showAddField) {
-            TextField(
-                value = newTagText,
-                onValueChange = onNewTagTextChange,
-                placeholder = { Text("nueva etiqueta", color = SubLabelGray) },
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
-                modifier = Modifier
-                    .width(140.dp)
-                    .onFocusChanged { if (!it.isFocused && newTagText.isNotBlank()) onCommitAdd() },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = CardBg,
-                    unfocusedContainerColor = CardBg,
-                    focusedIndicatorColor = TagAmber,
-                    unfocusedIndicatorColor = CardBorder
-                ),
-                trailingIcon = {
-                    IconButton(onClick = onCommitAdd) {
-                        Icon(Icons.Filled.Check, contentDescription = "Agregar", tint = TagAmber)
-                    }
-                }
-            )
-        } else {
-            Row(
+        if (showAddField && suggestions.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
+                    .background(CardBg)
                     .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
-                    .clickable { onStartAdd() }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("+ Añadir etiqueta", style = MaterialTheme.typography.labelMedium, color = SubLabelGray)
+                suggestions.forEachIndexed { index, suggestion ->
+                    Text(
+                        suggestion,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onCommitAdd(suggestion) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    )
+                    if (index < suggestions.lastIndex) {
+                        HorizontalDivider(color = DividerColor, thickness = 1.dp)
+                    }
+                }
             }
         }
     }
@@ -1295,5 +1543,155 @@ private fun PartyPickerDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BoxScope.SuccessConfirmationSheet(
+    info: TransactionSuccessInfo,
+    progress: Animatable<Float, AnimationVector1D>,
+    onAccept: () -> Unit,
+    onDetails: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var sheetHeightPx by remember { mutableStateOf(1f) }
+
+    val amountPrefix = when (info.type) {
+        "withdrawal" -> "-"
+        "deposit" -> "+"
+        else -> "⇄"
+    }
+    val formattedAmount = info.amount.toDoubleOrNull()?.let {
+        String.format(Locale.getDefault(), "%,.2f", it)
+    } ?: info.amount
+
+    Column(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .onGloballyPositioned { sheetHeightPx = it.size.height.toFloat().coerceAtLeast(1f) }
+            .graphicsLayer {
+                translationY = (1f - progress.value) * sheetHeightPx
+            }
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(CardBg)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            if (progress.value < 0.6f) {
+                                progress.animateTo(0f, tween(220))
+                                onAccept()
+                            } else {
+                                progress.animateTo(1f, tween(220))
+                            }
+                        }
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        val delta = dragAmount / sheetHeightPx
+                        scope.launch { progress.snapTo((progress.value - delta).coerceIn(0f, 1f)) }
+                    }
+                )
+            }
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .width(40.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(SubLabelGray)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(DepositColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Filled.Check, contentDescription = null, tint = DepositColor, modifier = Modifier.size(32.dp))
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Text(
+            "Transacción guardada exitosamente",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            "El movimiento se ha guardado correctamente y tu balance ha sido actualizado.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = LabelGray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.03f))
+                .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                .padding(horizontal = 16.dp)
+        ) {
+            SuccessSummaryRow(label = "Monto registrado", value = "$amountPrefix\$$formattedAmount MXN")
+            if (!info.accountName.isNullOrBlank()) {
+                RowDivider()
+                SuccessSummaryRow(label = info.accountLabel, value = info.accountName)
+            }
+            if (!info.categoryName.isNullOrBlank()) {
+                RowDivider()
+                SuccessSummaryRow(label = "Categoría", value = info.categoryName, valueColor = CategoryIndigo)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+            onClick = onAccept,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+        ) {
+            Text("Aceptar", color = Color.Black, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Button(
+            onClick = onDetails,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f))
+        ) {
+            Text("Ver detalle", color = Color.White, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun SuccessSummaryRow(label: String, value: String, valueColor: Color = Color.White) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = LabelGray)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = valueColor)
     }
 }

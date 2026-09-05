@@ -28,6 +28,7 @@ import com.example.appfireflyiii.ui.screens.newtransaction.NewTransactionViewMod
 import com.example.appfireflyiii.ui.screens.reports.ReportsScreen
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModel
 import com.example.appfireflyiii.ui.screens.reports.ReportsViewModelFactory
+import com.example.appfireflyiii.data.repository.TagRepository
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -41,7 +42,8 @@ fun MainTabsScreen(
     reportsViewModelFactory: ReportsViewModelFactory,
     accountRepository: AccountRepository,
     budgetRepository: BudgetRepository,
-    categoryRepository: CategoryRepository
+    categoryRepository: CategoryRepository,
+    tagRepository: TagRepository
 ) {
     val scope = rememberCoroutineScope()
 
@@ -73,7 +75,7 @@ fun MainTabsScreen(
                 }
                 Screen.NewTransaction -> {
                     val vm: NewTransactionViewModel = viewModel(factory = newTransactionViewModelFactory)
-                    NewTransactionScreen(navController, vm, accountRepository, budgetRepository, categoryRepository)
+                    NewTransactionScreen(navController, vm, accountRepository, budgetRepository, categoryRepository, tagRepository)
                 }
                 Screen.Reports -> {
                     val vm: ReportsViewModel = viewModel(factory = reportsViewModelFactory)
