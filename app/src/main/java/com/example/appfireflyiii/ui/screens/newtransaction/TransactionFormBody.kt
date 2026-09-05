@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -53,6 +54,7 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 
 import com.example.appfireflyiii.ui.theme.DetailScreenBg as ScreenBg
 import com.example.appfireflyiii.ui.theme.DetailCardBg as CardBg
@@ -347,28 +349,7 @@ fun TransactionFormBody(
                             actionLabel = "Cambiar",
                             onClick = { showSourcePicker = true }
                         )
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            IconButton(
-                                onClick = {
-                                    val temp = selectedSourceAccount
-                                    selectedSourceAccount = selectedDestinationAccount
-                                    selectedDestinationAccount = temp
-                                },
-                                modifier = Modifier
-                                    .padding(vertical = 4.dp)
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(IconBadgeBg)
-                                    .border(1.dp, CardBorder, CircleShape)
-                            ) {
-                                Icon(
-                                    Icons.Filled.SwapVert,
-                                    contentDescription = "Intercambiar origen y destino",
-                                    tint = IconBadgeTint,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                        Spacer(modifier = Modifier.height(24.dp))
                         FieldLabel("CUENTA DESTINO")
                         Spacer(modifier = Modifier.height(6.dp))
                         AccountSelectRow(
@@ -723,11 +704,42 @@ private fun RowDivider() {
 
 @Composable
 private fun FieldLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.5.sp),
-        color = LabelGray
-    )
+    val optionalRegex = remember { Regex("""\s*\(OPCIONAL\)""", RegexOption.IGNORE_CASE) }
+    val match = optionalRegex.find(text)
+
+    if (match != null) {
+        val mainText = text.substring(0, match.range.first)
+        val annotatedText = androidx.compose.ui.text.buildAnnotatedString {
+            withStyle(
+                style = androidx.compose.ui.text.SpanStyle(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+            ) {
+                append(mainText)
+            }
+            append(" ")
+            withStyle(
+                style = androidx.compose.ui.text.SpanStyle(
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.5.sp
+                )
+            ) {
+                append("(opcional)")
+            }
+        }
+        Text(
+            annotatedText,
+            style = MaterialTheme.typography.labelSmall,
+            color = LabelGray
+        )
+    } else {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.5.sp, fontWeight = FontWeight.Bold),
+            color = LabelGray
+        )
+    }
 }
 
 @Composable
@@ -773,7 +785,12 @@ private fun CollapsibleRowCard(
     BorderedCard(shape = RoundedCornerShape(18.dp)) {
         Column(modifier = Modifier.fillMaxWidth().animateContentSize().padding(16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { onToggle() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onToggle() },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -830,17 +847,14 @@ private fun AmountHeroCard(label: String, prefix: String, amount: String, onAmou
             }
             Spacer(modifier = Modifier.height(12.dp))
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.width(IntrinsicSize.Min)
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         prefix,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Medium,
                         color = SubLabelGray
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     BasicAmountField(amount = amount, onAmountChange = onAmountChange)
                 }
             }
@@ -857,18 +871,24 @@ private fun BasicAmountField(amount: String, onAmountChange: (String) -> Unit) {
         textStyle = androidx.compose.ui.text.TextStyle(
             fontSize = 40.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = Color.White,
+            textAlign = TextAlign.Center   // <- centra el texto ingresado
         ),
         cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.defaultMinSize(minWidth = 110.dp),
         decorationBox = { innerTextField ->
-            Box {
+            Box(
+                modifier = Modifier.fillMaxWidth(),   // <- ocupa todo el ancho disponible
+                contentAlignment = Alignment.Center   // <- centra el contenido (texto o placeholder)
+            ) {
                 if (amount.isEmpty()) {
                     Text(
                         "0.00",
                         style = androidx.compose.ui.text.TextStyle(
                             fontSize = 40.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
                         ),
                         color = SubLabelGray.copy(alpha = 0.5f),
                         maxLines = 1,
@@ -908,7 +928,7 @@ private fun AccountSelectRow(icon: ImageVector, name: String, subtitle: String, 
             Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = SubLabelGray)
         }
-        Text(actionLabel, style = MaterialTheme.typography.labelMedium, color = TransferColor, fontWeight = FontWeight.SemiBold)
+        Text(actionLabel, style = MaterialTheme.typography.labelMedium, color = LabelGray, fontWeight = FontWeight.SemiBold)
     }
 }
 

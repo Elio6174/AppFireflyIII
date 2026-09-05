@@ -287,18 +287,22 @@ fun SleekTextField(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
+        placeholder = { Text(label, color = Color.White.copy(alpha = 0.35f)) },
         modifier = Modifier.fillMaxWidth(),
         minLines = minLines,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(16.dp),
         keyboardOptions = keyboardOptions,
+        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedContainerColor = Color.White.copy(alpha = 0.05f),
+            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+            disabledContainerColor = Color.White.copy(alpha = 0.05f),
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            cursorColor = Color.White
         )
     )
 }
