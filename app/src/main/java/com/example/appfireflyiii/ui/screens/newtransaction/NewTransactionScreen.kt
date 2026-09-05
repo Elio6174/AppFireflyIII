@@ -6,13 +6,15 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.BudgetRepository
+import com.example.appfireflyiii.data.repository.CategoryRepository
 
 @Composable
 fun NewTransactionScreen(
     navController: NavController,
     viewModel: NewTransactionViewModel,
     accountRepository: AccountRepository,
-    budgetRepository: BudgetRepository
+    budgetRepository: BudgetRepository,
+    categoryRepository: CategoryRepository
 ) {
     val saveState by viewModel.saveState.collectAsState()
 
@@ -23,6 +25,7 @@ fun NewTransactionScreen(
         saveState = saveState,
         accountRepository = accountRepository,
         budgetRepository = budgetRepository,
+        categoryRepository = categoryRepository,
         onSave = { type, date, amount, description, sourceId, destinationName, sourceName, destinationId,
                    categoryName, budgetName, notes, tags, foreignAmount, foreignCurrencyCode, applyRules, fireWebhooks ->
             viewModel.save(

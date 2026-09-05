@@ -55,6 +55,8 @@ import java.util.Locale
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import com.example.appfireflyiii.data.model.CategoryData
+import com.example.appfireflyiii.data.repository.CategoryRepository
 
 import com.example.appfireflyiii.ui.theme.DetailScreenBg as ScreenBg
 import com.example.appfireflyiii.ui.theme.DetailCardBg as CardBg
@@ -97,6 +99,7 @@ fun TransactionFormBody(
     saveState: SaveState,
     accountRepository: AccountRepository,
     budgetRepository: BudgetRepository,
+    categoryRepository: CategoryRepository,
     allowTypeChange: Boolean = true,
     onSave: (
         type: String,
@@ -124,6 +127,9 @@ fun TransactionFormBody(
     var amount by remember { mutableStateOf(initialValues.amount) }
     var description by remember { mutableStateOf(initialValues.description) }
     var category by remember { mutableStateOf(initialValues.category) }
+    var categories by remember { mutableStateOf<List<CategoryData>>(emptyList()) }
+    var selectedCategory by remember { mutableStateOf<CategoryData?>(null) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
     var notes by remember { mutableStateOf(initialValues.notes) }
     var tags by remember {
         mutableStateOf(
@@ -196,6 +202,11 @@ fun TransactionFormBody(
             budgets = loaded
             selectedBudget = loaded.find { it.attributes.name == initialValues.budgetName }
         }
+
+        categoryRepository.getCategories().onSuccess { loaded ->
+            categories = loaded
+            selectedCategory = loaded.find { it.attributes.name == initialValues.category }
+        }
     }
 
     LaunchedEffect(saveState) {
@@ -211,6 +222,7 @@ fun TransactionFormBody(
                 foreignAmount = ""
                 foreignCurrency = ""
                 selectedBudget = null
+                selectedCategory = null
                 selectedDateMillis = null
                 selectedHour = null
                 selectedMinute = null
@@ -436,9 +448,10 @@ fun TransactionFormBody(
             SectionCard(title = "CLASIFICACIÓN", icon = Icons.Filled.Category) {
                 FieldLabel("CATEGORÍA")
                 Spacer(modifier = Modifier.height(6.dp))
-                CategoryField(
-                    value = category,
-                    onValueChange = { category = it }
+                BudgetSelectRow(
+                    name = selectedCategory?.attributes?.name ?: "(ninguna)",
+                    isSelected = selectedCategory != null,
+                    onClick = { showCategoryPicker = true }
                 )
 
                 if (transactionType == "withdrawal" && budgets.isNotEmpty()) {
@@ -446,7 +459,8 @@ fun TransactionFormBody(
                     FieldLabel("PRESUPUESTO")
                     Spacer(modifier = Modifier.height(6.dp))
                     BudgetSelectRow(
-                        name = selectedBudget?.attributes?.name ?: "(ninguno)",
+                        name = selectedBudget?.attributes?.name ?: "(ninguna)",
+                        isSelected = selectedBudget != null,
                         onClick = { showBudgetPicker = true }
                     )
                 }
@@ -632,6 +646,13 @@ fun TransactionFormBody(
             budgets = budgets,
             onDismiss = { showBudgetPicker = false },
             onSelect = { selectedBudget = it; showBudgetPicker = false }
+        )
+    }
+    if (showCategoryPicker) {
+        CategoryPickerDialog(
+            categories = categories,
+            onDismiss = { showCategoryPicker = false },
+            onSelect = { selectedCategory = it; showCategoryPicker = false }
         )
     }
 
@@ -872,7 +893,7 @@ private fun BasicAmountField(amount: String, onAmountChange: (String) -> Unit) {
             fontSize = 40.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            textAlign = TextAlign.Center   // <- centra el texto ingresado
+            textAlign = TextAlign.Center
         ),
         cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -933,7 +954,7 @@ private fun AccountSelectRow(icon: ImageVector, name: String, subtitle: String, 
 }
 
 @Composable
-private fun BudgetSelectRow(name: String, onClick: () -> Unit) {
+private fun BudgetSelectRow(name: String, isSelected: Boolean? = null, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -946,7 +967,14 @@ private fun BudgetSelectRow(name: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color.White)
-        Icon(Icons.Filled.ExpandMore, contentDescription = null, tint = SubLabelGray)
+        if (isSelected != null) {
+            Text(
+                if (isSelected) "Cambiar" else "Elegir",
+                style = MaterialTheme.typography.labelMedium,
+                color = LabelGray,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 
@@ -1183,6 +1211,26 @@ private fun BudgetPickerDialog(budgets: List<BudgetData>, onDismiss: () -> Unit,
                     }
                     items(budgets) { budget ->
                         BudgetSelectRow(name = budget.attributes.name, onClick = { onSelect(budget) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryPickerDialog(categories: List<CategoryData>, onDismiss: () -> Unit, onSelect: (CategoryData?) -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        BorderedCard(shape = RoundedCornerShape(20.dp)) {
+            Column(modifier = Modifier.padding(16.dp).heightIn(max = 420.dp)) {
+                Text("Selecciona una categoría", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        BudgetSelectRow(name = "(ninguna)", onClick = { onSelect(null) })
+                    }
+                    items(categories) { cat ->
+                        BudgetSelectRow(name = cat.attributes.name, onClick = { onSelect(cat) })
                     }
                 }
             }

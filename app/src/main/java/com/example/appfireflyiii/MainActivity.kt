@@ -36,6 +36,7 @@ import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountScreen
 import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountViewModel
 import com.example.appfireflyiii.ui.screens.createaccount.CreateAccountViewModelFactory
 import com.example.appfireflyiii.data.repository.BudgetRepository
+import com.example.appfireflyiii.data.repository.CategoryRepository
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailScreen
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModel
 import com.example.appfireflyiii.ui.screens.transactiondetail.TransactionDetailViewModelFactory
@@ -78,6 +79,7 @@ fun FireflyApp(activity: FragmentActivity) {
     val tagRepository = remember { TagRepository(fireflyApi) }
     val reportsViewModelFactory = remember { ReportsViewModelFactory(transactionRepository, accountRepository, tagRepository) }
     val budgetRepository = remember { BudgetRepository(fireflyApi) }
+    val categoryRepository = remember { CategoryRepository(fireflyApi) }
 
     var isAuthenticated by remember { mutableStateOf(false) }
     val hasToken = remember { tokenStorage.getToken() != null }
@@ -123,7 +125,8 @@ fun FireflyApp(activity: FragmentActivity) {
                     newTransactionViewModelFactory = newTransactionViewModelFactory,
                     reportsViewModelFactory = reportsViewModelFactory,
                     accountRepository = accountRepository,
-                    budgetRepository = budgetRepository
+                    budgetRepository = budgetRepository,
+                    categoryRepository = categoryRepository
                 )
             }
 
@@ -194,7 +197,7 @@ fun FireflyApp(activity: FragmentActivity) {
                     TransactionDetailViewModelFactory(transactionRepository, groupId, journalId)
                 }
                 val viewModel: TransactionDetailViewModel = viewModel(key = "$groupId/$journalId", factory = factory)
-                TransactionDetailScreen(navController, viewModel, accountRepository, budgetRepository)
+                TransactionDetailScreen(navController, viewModel, accountRepository, budgetRepository, categoryRepository)
             }
             composable(Screen.CreateAccount.route) {
                 val factory = remember { CreateAccountViewModelFactory(accountRepository) }

@@ -11,6 +11,7 @@ import com.example.appfireflyiii.data.model.TransactionStoreResponse
 import com.example.appfireflyiii.data.model.TransactionUpdateRequest
 import com.example.appfireflyiii.data.model.BudgetResponse
 import com.example.appfireflyiii.data.model.TagResponse
+import com.example.appfireflyiii.data.model.CategoryResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -82,4 +83,10 @@ interface FireflyApi {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 200
     ): TagResponse
+
+    @GET("api/v1/categories")
+    suspend fun getCategories(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 200
+    ): CategoryResponse
 }

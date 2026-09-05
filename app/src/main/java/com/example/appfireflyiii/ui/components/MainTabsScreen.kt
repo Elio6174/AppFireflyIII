@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.BudgetRepository
+import com.example.appfireflyiii.data.repository.CategoryRepository
 import com.example.appfireflyiii.navigation.Screen
 import com.example.appfireflyiii.navigation.bottomNavItems
 import com.example.appfireflyiii.ui.screens.accounts.AccountsScreen
@@ -39,7 +40,8 @@ fun MainTabsScreen(
     newTransactionViewModelFactory: NewTransactionViewModelFactory,
     reportsViewModelFactory: ReportsViewModelFactory,
     accountRepository: AccountRepository,
-    budgetRepository: BudgetRepository
+    budgetRepository: BudgetRepository,
+    categoryRepository: CategoryRepository
 ) {
     val scope = rememberCoroutineScope()
 
@@ -71,7 +73,7 @@ fun MainTabsScreen(
                 }
                 Screen.NewTransaction -> {
                     val vm: NewTransactionViewModel = viewModel(factory = newTransactionViewModelFactory)
-                    NewTransactionScreen(navController, vm, accountRepository, budgetRepository)
+                    NewTransactionScreen(navController, vm, accountRepository, budgetRepository, categoryRepository)
                 }
                 Screen.Reports -> {
                     val vm: ReportsViewModel = viewModel(factory = reportsViewModelFactory)

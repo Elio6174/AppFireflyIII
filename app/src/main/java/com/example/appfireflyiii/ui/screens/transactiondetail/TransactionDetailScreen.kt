@@ -63,13 +63,15 @@ import com.example.appfireflyiii.ui.theme.DetailCancelButtonBg as CancelButtonBg
 import androidx.compose.material.icons.filled.ArrowDownward
 import java.text.SimpleDateFormat
 import java.util.Locale
+import com.example.appfireflyiii.data.repository.CategoryRepository
 
 @Composable
 fun TransactionDetailScreen(
     navController: NavController,
     viewModel: TransactionDetailViewModel,
     accountRepository: AccountRepository,
-    budgetRepository: BudgetRepository
+    budgetRepository: BudgetRepository,
+    categoryRepository: CategoryRepository
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
@@ -165,6 +167,7 @@ fun TransactionDetailScreen(
                                 saveState = saveState,
                                 accountRepository = accountRepository,
                                 budgetRepository = budgetRepository,
+                                categoryRepository = categoryRepository,
                                 onSave = { type, date, amount, description, sourceId, destinationName, sourceName,
                                            destinationId, categoryName, budgetName, notes, tags, foreignAmount,
                                            foreignCurrencyCode, applyRules, fireWebhooks ->
