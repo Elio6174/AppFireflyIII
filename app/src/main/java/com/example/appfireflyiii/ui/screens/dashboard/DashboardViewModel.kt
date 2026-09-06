@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.appfireflyiii.data.model.TransactionSplit
 import com.example.appfireflyiii.data.repository.AccountRepository
 import com.example.appfireflyiii.data.repository.TransactionRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -14,12 +17,27 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+data class BalanceSeries(
+    val accountId: String,
+    val accountName: String,
+    val values: List<Double>
+)
+
+data class BalanceHistory(
+    val dayLabels: List<String>,
+    val series: List<BalanceSeries>,
+    val totalCurrent: Double,
+    val percentChange: Double,
+    val currencySymbol: String
+)
+
 data class DashboardData(
     val netWorth: BigDecimal,
     val monthlyIncome: BigDecimal,
     val monthlyExpense: BigDecimal,
     val currencySymbol: String,
-    val recentTransactions: List<TransactionSplit>
+    val recentTransactions: List<TransactionSplit>,
+    val balanceHistory: BalanceHistory?
 )
 
 sealed class DashboardUiState {
@@ -39,7 +57,6 @@ class DashboardViewModel(
     init {
         loadDashboard()
     }
-
 
     fun loadDashboard() {
         viewModelScope.launch {
@@ -90,16 +107,83 @@ class DashboardViewModel(
                 .sortedByDescending { it.date }
                 .take(5)
 
+            val balanceHistory = loadBalanceHistory(accounts)
+
             _uiState.value = DashboardUiState.Success(
                 DashboardData(
                     netWorth = netWorth,
                     monthlyIncome = income,
                     monthlyExpense = expense,
                     currencySymbol = currencySymbol,
-                    recentTransactions = recentSplits
+                    recentTransactions = recentSplits,
+                    balanceHistory = balanceHistory
                 )
             )
         }
+    }
+
+    private suspend fun loadBalanceHistory(accounts: List<com.example.appfireflyiii.data.model.AccountData>): BalanceHistory? {
+        val assetAccounts = accounts.filter { it.attributes.type == "asset" }
+        if (assetAccounts.isEmpty()) return null
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dayLabelFormat = SimpleDateFormat("EEE", Locale("es", "MX"))
+
+        val dates = mutableListOf<String>()
+        val dayLabels = mutableListOf<String>()
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.DAY_OF_YEAR, -6)
+
+        repeat(7) {
+            dates.add(dateFormat.format(calendar.time))
+            val label = dayLabelFormat.format(calendar.time)
+                .replace(".", "")
+                .take(3)
+                .replaceFirstChar { it.uppercase() }
+            dayLabels.add(label)
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        val results = coroutineScope {
+            dates.map { date ->
+                async { accountRepository.getAssetAccountsAsOf(date) }
+            }.awaitAll()
+        }
+
+        val accountNames = assetAccounts.associate { it.id to it.attributes.name }
+        val currencySymbol = assetAccounts.firstOrNull()?.attributes?.currencySymbol ?: "$"
+
+        val perAccountValues = mutableMapOf<String, MutableList<Double>>()
+        val totalsPerDay = MutableList(dates.size) { 0.0 }
+
+        results.forEachIndexed { index, result ->
+            val dayAccounts = result.getOrNull() ?: emptyList()
+            val balancesById = dayAccounts.associate { it.id to (it.attributes.currentBalance.toDoubleOrNull() ?: 0.0) }
+            accountNames.keys.forEach { id ->
+                val list = perAccountValues.getOrPut(id) { mutableListOf() }
+                val value = balancesById[id] ?: (list.lastOrNull() ?: 0.0)
+                list.add(value)
+                totalsPerDay[index] += value
+            }
+        }
+
+        val series = accountNames.map { (id, name) ->
+            BalanceSeries(accountId = id, accountName = name, values = perAccountValues[id] ?: emptyList())
+        }
+
+        val totalCurrent = totalsPerDay.lastOrNull() ?: 0.0
+        val firstTotal = totalsPerDay.firstOrNull() ?: 0.0
+        val percentChange = if (firstTotal != 0.0) {
+            ((totalCurrent - firstTotal) / kotlin.math.abs(firstTotal)) * 100
+        } else 0.0
+
+        return BalanceHistory(
+            dayLabels = dayLabels,
+            series = series,
+            totalCurrent = totalCurrent,
+            percentChange = percentChange,
+            currencySymbol = currencySymbol
+        )
     }
 
     private fun currentMonthRange(): Pair<String, String> {

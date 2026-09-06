@@ -58,4 +58,13 @@ class AccountRepository(private val api: FireflyApi) {
             Result.failure(e)
         }
     }
+
+    suspend fun getAssetAccountsAsOf(date: String): Result<List<AccountData>> {
+        return try {
+            val assets = api.getAccounts(type = "asset", date = date).data
+            Result.success(assets.filter { it.attributes.type != "initial-balance" })
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

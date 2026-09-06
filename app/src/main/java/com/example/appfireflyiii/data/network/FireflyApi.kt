@@ -25,7 +25,8 @@ interface FireflyApi {
     suspend fun getAccounts(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50,
-        @Query("type") type: String = "all"
+        @Query("type") type: String = "all",
+        @Query("date") date: String? = null
     ): AccountResponse
 
     @GET("api/v1/transactions")
