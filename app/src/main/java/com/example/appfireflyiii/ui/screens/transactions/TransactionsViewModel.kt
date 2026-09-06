@@ -18,7 +18,10 @@ sealed class TransactionsUiState {
     data class Success(
         val transactions: List<TransactionGroup>,
         val monthLabel: String,
-        val canGoForward: Boolean
+        val canGoForward: Boolean,
+        val totalIncome: Double,
+        val totalExpense: Double,
+        val currencySymbol: String?
     ) : TransactionsUiState()
     data class Error(val message: String) : TransactionsUiState()
 }
@@ -53,13 +56,39 @@ class TransactionsViewModel(
 
             result
                 .onSuccess { groups ->
-                    val filtered = groups
+                    val withoutOpeningBalance = groups
                         .map { group ->
                             group.copy(
                                 attributes = group.attributes.copy(
                                     transactions = group.attributes.transactions.filter {
-                                        it.type != "opening balance" &&
-                                                (filterType == null || it.type == filterType)
+                                        it.type != "opening balance"
+                                    }
+                                )
+                            )
+                        }
+                        .filter { it.attributes.transactions.isNotEmpty() }
+
+                    var totalIncome = 0.0
+                    var totalExpense = 0.0
+                    var currencySymbol: String? = null
+
+                    withoutOpeningBalance.forEach { group ->
+                        group.attributes.transactions.forEach { split ->
+                            val value = split.amount.toDoubleOrNull() ?: 0.0
+                            if (currencySymbol == null) currencySymbol = split.currencySymbol
+                            when (split.type) {
+                                "deposit" -> totalIncome += kotlin.math.abs(value)
+                                "withdrawal" -> totalExpense += kotlin.math.abs(value)
+                            }
+                        }
+                    }
+
+                    val filtered = withoutOpeningBalance
+                        .map { group ->
+                            group.copy(
+                                attributes = group.attributes.copy(
+                                    transactions = group.attributes.transactions.filter {
+                                        filterType == null || it.type == filterType
                                     }
                                 )
                             )
@@ -69,10 +98,14 @@ class TransactionsViewModel(
                     val sorted = filtered.sortedByDescending { group ->
                         group.attributes.transactions.firstOrNull()?.date ?: ""
                     }
+
                     _uiState.value = TransactionsUiState.Success(
                         transactions = sorted,
                         monthLabel = label,
-                        canGoForward = monthOffset < 0
+                        canGoForward = monthOffset < 0,
+                        totalIncome = totalIncome,
+                        totalExpense = totalExpense,
+                        currencySymbol = currencySymbol
                     )
                 }
                 .onFailure { error ->
