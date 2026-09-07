@@ -7,6 +7,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object FireflyClient {
+    //aqui pones la ip de tu servidor
     private const val BASE_URL = "http://finanzas.else.mx/"
 
     fun create(tokenProvider: () -> String?): FireflyApi {
