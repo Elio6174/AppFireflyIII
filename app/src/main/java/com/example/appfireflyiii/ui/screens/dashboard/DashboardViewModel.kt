@@ -171,10 +171,18 @@ class DashboardViewModel(
             BalanceSeries(accountId = id, accountName = name, values = perAccountValues[id] ?: emptyList())
         }
 
+        val accountCount = accountNames.size.coerceAtLeast(1)
+        val averageToday = (totalsPerDay.lastOrNull() ?: 0.0) / accountCount
+        val averageYesterday = if (totalsPerDay.size >= 2) {
+            totalsPerDay[totalsPerDay.size - 2] / accountCount
+        } else {
+            averageToday
+        }
+
         val totalCurrent = totalsPerDay.lastOrNull() ?: 0.0
-        val firstTotal = totalsPerDay.firstOrNull() ?: 0.0
-        val percentChange = if (firstTotal != 0.0) {
-            ((totalCurrent - firstTotal) / kotlin.math.abs(firstTotal)) * 100
+
+        val percentChange = if (averageYesterday != 0.0) {
+            ((averageToday - averageYesterday) / kotlin.math.abs(averageYesterday)) * 100
         } else 0.0
 
         return BalanceHistory(
