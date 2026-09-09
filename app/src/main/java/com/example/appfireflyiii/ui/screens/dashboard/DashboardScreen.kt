@@ -728,15 +728,27 @@ fun RecentTransactionRow(split: TransactionSplit, onClick: () -> Unit = {}) {
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        Column(horizontalAlignment = Alignment.End) {
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier.widthIn(max = 110.dp)
+        ) {
             if (!split.categoryName.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(IconBadgeBg)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .widthIn(max = 110.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(split.categoryName, style = MaterialTheme.typography.labelSmall, color = SubLabelGray)
+                    Text(
+                        split.categoryName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SubLabelGray,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
             }
@@ -744,7 +756,8 @@ fun RecentTransactionRow(split: TransactionSplit, onClick: () -> Unit = {}) {
                 "$prefix${formatAmount(amountValue, split.currencySymbol)}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = amountColor
+                color = amountColor,
+                textAlign = TextAlign.End
             )
         }
     }
