@@ -572,7 +572,7 @@ private fun BalanceTooltip(history: BalanceHistory, dayIndex: Int, modifier: Mod
 
     Column(
         modifier = modifier
-            .width(140.dp)
+            .width(170.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black.copy(alpha = 0.9f))
             .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
@@ -605,9 +605,19 @@ private fun BalanceTooltip(history: BalanceHistory, dayIndex: Int, modifier: Mod
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        formatSplitAmount(value, history.currencySymbol),
+                        series.accountName,
                         style = MaterialTheme.typography.labelSmall,
                         color = SubLabelGray,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        formatSplitAmount(value, history.currencySymbol),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
                         maxLines = 1
                     )
                 }
